@@ -1,5 +1,7 @@
 module SeDuMi
 
+using MATLAB
+
 export sedumi
 
 # Solve the LP in standard form: min c'x, s.t. Ax = b, x ≥ 0
