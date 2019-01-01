@@ -1,8 +1,20 @@
 # SeDuMi
 
-`SeDuMi.jl` is an interface to the **[SeDuMi](http://sedumi.ie.lehigh.edu/)** solver.
-It is still a work in progress but it aims to provide a complete interface to the low-level MATLAB API,
-as well as an implementation of the solver-independent `MathOptInterface` API.
+`SeDuMi.jl` is an interface to the **[SeDuMi](http://sedumi.ie.lehigh.edu/)**
+solver. It exports the `sedumi` function that is a thin wrapper on top of the
+`sedumi` MATLAB function and use it to define the `SeDuMi.Optimizer` object that
+implements the solver-independent `MathOptInterface` API.
+
+To use it with JuMP, simply do
+```julia
+using JuMP
+using SeDuMi
+model = Model(with_optimizer(SeDuMi.Optimizer))
+```
+To suppress output, do
+```julia
+model = Model(with_optimizer(SeDuMi.Optimizer, fid=0))
+```
 
 ## Installation
 
