@@ -25,7 +25,7 @@ end
 
 # Solve the primal/dual pair
 # min c'x,      max b'y
-# s.t. Ax = b,   c - Ax ∈ K
+# s.t. Ax = b,   c - A'x ∈ K
 #       x ∈ K
 function sedumi(A::Union{Matrix{Float64}, SparseMatrixCSC{Float64}},
                 b::Vector{Float64}, c::Vector{Float64},

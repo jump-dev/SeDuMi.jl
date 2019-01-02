@@ -7,6 +7,18 @@ const VI = MOI.VariableIndex
 
 const MOIU = MOI.Utilities
 
+
+# SeDuMi solves the primal/dual pair
+# min c'x,       max b'y
+# s.t. Ax = b,   c - A'x ∈ K
+#       x ∈ K
+# where K is a product of Zeros, Nonnegatives, SecondOrderCone,
+# RotatedSecondOrderCone and PositiveSemidefiniteConeTriangle
+
+# This wrapper copies the MOI problem to the SeDuMi dual so the natively
+# supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
+# of the sets just listed above.
+
 const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
 const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64},
                  MOI.LessThan{Float64},
