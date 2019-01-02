@@ -19,10 +19,8 @@ const MOIU = MOI.Utilities
 # supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
 # of the sets just listed above.
 
-const SF = Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Float64}, MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64},
-                 MOI.LessThan{Float64},
-                 MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+const SF = Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
+const SS = Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
                  MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
                  MOI.PositiveSemidefiniteConeTriangle}
 
@@ -54,11 +52,10 @@ mutable struct ConeData
     sum_q::Int # cached value of sum(q)
     sum_r::Int # cached value of sum(r)
     sum_s2::Int # cached value of sum(s.^2)
-    setconstant::Dict{Int, Float64} # For the constant of EqualTo, LessThan and GreaterThan, they are used for getting the `ConstraintPrimal` as the slack is Ax - b but MOI expects Ax so we need to add the constant b to the slack to get Ax
     nrows::Dict{Int, Int} # The number of rows of each vector sets, this is used by `constrrows` to recover the number of rows used by a constraint when getting `ConstraintPrimal` or `ConstraintDual`
     function ConeData()
         new(Cone(0, 0, Float64[], Float64[], Float64[]),
-            0, 0, 0, Dict{Int, Float64}(), Dict{Int, Int}())
+            0, 0, 0, Dict{Int, Int}())
     end
 end
 
@@ -100,18 +97,16 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
 end
 
-const ZeroCones = Union{MOI.EqualTo, MOI.Zeros}
-const LPCones = Union{MOI.GreaterThan, MOI.LessThan,
-                      MOI.Nonnegatives, MOI.Nonpositives}
+const LPCones = Union{MOI.Nonnegatives, MOI.Nonpositives}
 
 # Computes cone dimensions
 function constroffset(cone::ConeData,
-                      ci::CI{<:MOI.AbstractFunction, <:ZeroCones})
+                      ci::CI{<:MOI.AbstractFunction, MOI.Zeros})
     return ci.value
 end
 #_allocate_constraint: Allocate indices for the constraint `f`-in-`s`
 # using information in `cone` and then update `cone`
-function _allocate_constraint(cone::ConeData, f, s::ZeroCones)
+function _allocate_constraint(cone::ConeData, f, s::MOI.Zeros)
     ci = Int(cone.K.f)
     cone.K.f += MOI.dimension(s)
     return ci
@@ -204,7 +199,7 @@ function _scalecoef(coef, minus::Bool,
     return minus ? -coef : coef
 end
 function _scalecoef(coef, minus::Bool,
-                    ::Union{Type{<:MOI.LessThan}, Type{<:MOI.Nonpositives}},
+                    ::Type{MOI.Nonpositives},
                     rev, args...)
     return minus ? coef : -coef
 end
@@ -249,31 +244,10 @@ coefficient(t::MOI.ScalarAffineTerm) = t.coefficient
 coefficient(t::MOI.VectorAffineTerm) = coefficient(t.scalar_term)
 # constrrows: Recover the number of rows used by each constraint.
 # When, the set is available, simply use MOI.dimension
-constrrows(::MOI.AbstractScalarSet) = 1
 constrrows(s::MOI.AbstractVectorSet) = 1:MOI.dimension(s)
 constrrows(s::MOI.PositiveSemidefiniteConeTriangle) = 1:(s.side_dimension^2)
 # When only the index is available, use the `optimizer.ncone.nrows` field
-constrrows(optimizer::Optimizer, ci::CI{<:MOI.AbstractScalarFunction, <:MOI.AbstractScalarSet}) = 1
 constrrows(optimizer::Optimizer, ci::CI{<:MOI.AbstractVectorFunction, <:MOI.AbstractVectorSet}) = 1:optimizer.cone.nrows[constroffset(optimizer, ci)]
-MOIU.load_constraint(optimizer::Optimizer, ci, f::MOI.SingleVariable, s) = MOIU.load_constraint(optimizer, ci, MOI.ScalarAffineFunction{Float64}(f), s)
-function MOIU.load_constraint(optimizer::Optimizer, ci, f::MOI.ScalarAffineFunction, s::MOI.AbstractScalarSet)
-    a = sparsevec(variable_index_value.(f.terms), coefficient.(f.terms))
-    # `sparsevec` combines duplicates with `+` but does not remove the zeros
-    # `created` so we call `dropzeros!`
-    dropzeros!(a)
-    offset = constroffset(optimizer, ci)
-    row = constrrows(s)
-    i = offset + row
-    # The SCS format is c - Ax ∈ cone
-    # so minus=false for b and minus=true for A
-    setconstant = MOIU.getconstant(s)
-    optimizer.cone.setconstant[offset] = setconstant
-    constant = f.constant - setconstant
-    optimizer.data.c[i] = scalecoef(constant, false, s)
-    append!(optimizer.data.I, fill(i, length(a.nzind)))
-    append!(optimizer.data.J, a.nzind)
-    append!(optimizer.data.V, scalecoef(a.nzval, true, s))
-end
 MOIU.load_constraint(optimizer::Optimizer, ci, f::MOI.VectorOfVariables, s) = MOIU.load_constraint(optimizer, ci, MOI.VectorAffineFunction{Float64}(f), s)
 orderval(val, s) = val
 function orderval(val, s::MOI.PositiveSemidefiniteConeTriangle)
@@ -454,8 +428,6 @@ function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, vi::VI)
     optimizer.sol.y[vi.value]
 end
 MOI.get(optimizer::Optimizer, a::MOI.VariablePrimal, vi::Vector{VI}) = MOI.get.(optimizer, a, vi)
-_unshift(optimizer::Optimizer, offset, value, s) = value
-_unshift(optimizer::Optimizer, offset, value, s::Type{<:MOI.AbstractScalarSet}) = value + optimizer.cone.setconstant[offset]
 reorderval(val, s) = val
 function reorderval(val, ::Type{MOI.PositiveSemidefiniteConeTriangle})
     return squareUtosympackedU(val)
@@ -466,7 +438,7 @@ function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
     rows = constrrows(optimizer, ci)
     sqr = optimizer.sol.slack[offset .+ rows]
     tri = reorderval(sqr, S)
-    return _unshift(optimizer, offset, unscalecoef(tri, S), S)
+    return unscalecoef(tri, S)
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet

@@ -10,12 +10,12 @@ using SeDuMi
 const MOIU = MOI.Utilities
 MOIU.@model(ModelData,
             (),
-            (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan),
+            (),
             (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone,
              MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle),
             (),
-            (MOI.SingleVariable,),
-            (MOI.ScalarAffineFunction,),
+            (),
+            (),
             (MOI.VectorOfVariables,),
             (MOI.VectorAffineFunction,))
 
@@ -34,7 +34,8 @@ end
 config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 @testset "Unit" begin
-    MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config,
+    MOIT.unittest(MOIB.SplitInterval{Float64}(MOIB.Vectorize{Float64}(optimizer)),
+                  config,
                   [# Quadratic functions are not supported
                    "solve_qcp_edge_cases", "solve_qp_edge_cases",
                    # Integer and ZeroOne sets are not supported
@@ -42,12 +43,13 @@ config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 end
 
 @testset "Continuous linear problems" begin
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config,
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(MOIB.Vectorize{Float64}(optimizer)),
+                        config,
                         ["linear13"] # See https://github.com/blegat/SeDuMi.jl/issues/7
                        )
 end
 
 @testset "Continuous conic problems" begin
-    MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(optimizer))),
+    MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(MOIB.Vectorize{Float64}(optimizer)))),
                        config, ["rootdets", "exp", "logdet"])
 end
