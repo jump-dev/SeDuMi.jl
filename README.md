@@ -20,7 +20,7 @@ model = Model(with_optimizer(SeDuMi.Optimizer, fid=0))
 
 You can install `SeDuMi.jl` through the Julia package manager:
 ```julia
-] add SeDuMi
+] add https://github.com/blegat/SeDuMi.jl.git
 ```
 but you first need to make sure that you satisfy the requirements of the
 [MATLAB.jl](https://github.com/JuliaInterop/MATLAB.jl) Julia package and that
