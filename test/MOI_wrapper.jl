@@ -43,8 +43,7 @@ end
 
 @testset "Continuous linear problems" begin
     MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config,
-                        ["linear11", # See https://github.com/sqlp/sedumi/issues/43
-                         "linear13"] # See https://github.com/sqlp/sedumi/issues/42
+                        ["linear13"] # See https://github.com/blegat/SeDuMi.jl/issues/7
                        )
 end
 
