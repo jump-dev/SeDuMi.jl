@@ -348,7 +348,13 @@ function MOI.optimize!(optimizer::Optimizer)
     cone = optimizer.cone
     m = optimizer.data.m
     n = optimizer.data.n
-    A = sparse(optimizer.data.J, optimizer.data.I, optimizer.data.V)
+    if false && m == n
+        # If m == n, SeDuMi thinks we give A'.
+        # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
+        A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
+    else
+        A = sparse(optimizer.data.J, optimizer.data.I, optimizer.data.V)
+    end
     c = optimizer.data.c
     objconstant = optimizer.data.objconstant
     b = optimizer.data.b
