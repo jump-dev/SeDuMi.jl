@@ -205,7 +205,7 @@ function _scalecoef(coef::AbstractVector, rev::Bool, rows::AbstractVector,
     end
     return output
 end
-# Unscale the coefficients in `coef` with respective rows in `rows` for a set `s` and multiply by `-1` if `minus` is `true`.
+# Unscale the coefficients in `coef` with respective rows in `rows` for a set `s`
 function scalecoef(coef, s::MOI.PositiveSemidefiniteConeTriangle,
                    rows)
     return _scalecoef(coef, false, rows, s.side_dimension)
@@ -249,7 +249,7 @@ function MOIU.load_constraint(optimizer::Optimizer, ci, f::MOI.VectorAffineFunct
         V = scalecoef(V, s, I)
         I = sympackedUtosquareUidx(I, s.side_dimension)
     end
-    # The SCS format is b - Ax ∈ cone
+    # The SeDuMi format is b - Ax ∈ cone
     optimizer.data.c[i] = c
     append!(optimizer.data.I, offset .+ I)
     append!(optimizer.data.J, J)

@@ -9,17 +9,10 @@ const MOIB = MOI.Bridges
 import SeDuMi
 const optimizer = SeDuMi.Optimizer(fid=0)
 
-const MOIU = MOI.Utilities
-MOIU.@model(ModelData,
-            (),
-            (),
+MOIU.@model(ModelData, (), (),
             (MOI.Zeros, MOI.Nonnegatives, MOI.SecondOrderCone,
              MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle),
-            (),
-            (),
-            (),
-            (MOI.VectorOfVariables,),
-            (MOI.VectorAffineFunction,))
+            (), (), (), (MOI.VectorOfVariables,), (MOI.VectorAffineFunction,))
 
 # UniversalFallback is needed for starting values, even if they are ignored by SeDuMi
 const cache = MOIU.UniversalFallback(ModelData{Float64}())
