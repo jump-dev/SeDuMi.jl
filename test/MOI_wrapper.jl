@@ -7,7 +7,8 @@ const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
 import SeDuMi
-const optimizer = SeDuMi.Optimizer(fid=0)
+const optimizer = SeDuMi.Optimizer()
+MOI.set(optimizer, MOI.Silent(), true)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "SeDuMi"
@@ -32,8 +33,7 @@ const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 @testset "Unit" begin
-    MOIT.unittest(MOIB.SplitInterval{Float64}(bridged),
-                  config,
+    MOIT.unittest(bridged, config,
                   [# Quadratic functions are not supported
                    "solve_qcp_edge_cases", "solve_qp_edge_cases",
                    # Integer and ZeroOne sets are not supported
@@ -41,13 +41,9 @@ config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 end
 
 @testset "Continuous linear problems" begin
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(bridged),
-                        config,
-                        ["linear13"] # See https://github.com/blegat/SeDuMi.jl/issues/7
-                       )
+    MOIT.contlineartest(bridged, config, ["linear13"]) # See https://github.com/blegat/SeDuMi.jl/issues/7
 end
 
 @testset "Continuous conic problems" begin
-    MOIT.contconictest(MOIB.SquarePSD{Float64}(MOIB.RootDet{Float64}(MOIB.GeoMean{Float64}(bridged))),
-                       config, ["rootdets", "exp", "logdet"])
+    MOIT.contconictest(bridged, config, ["rootdets", "exp", "logdet"])
 end
