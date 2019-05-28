@@ -9,6 +9,15 @@ const MOIB = MOI.Bridges
 import SeDuMi
 const optimizer = SeDuMi.Optimizer(fid=0)
 
+@testset "SolverName" begin
+    @test MOI.get(optimizer, MOI.SolverName()) == "SeDuMi"
+end
+
+@testset "supports_allocate_load" begin
+    @test MOIU.supports_allocate_load(optimizer, false)
+    @test !MOIU.supports_allocate_load(optimizer, true)
+end
+
 MOIU.@model(ModelData, (), (),
             (MOI.Zeros, MOI.Nonnegatives, MOI.SecondOrderCone,
              MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle),
@@ -18,17 +27,7 @@ MOIU.@model(ModelData, (), (),
 const cache = MOIU.UniversalFallback(ModelData{Float64}())
 const cached = MOIU.CachingOptimizer(cache, optimizer)
 
-# Essential bridges that are needed for all tests
-const bridged = MOIB.Vectorize{Float64}(MOIB.NonposToNonneg{Float64}(cached))
-
-@testset "SolverName" begin
-    @test MOI.get(optimizer, MOI.SolverName()) == "SeDuMi"
-end
-
-@testset "supports_allocate_load" begin
-    @test MOIU.supports_allocate_load(optimizer, false)
-    @test !MOIU.supports_allocate_load(optimizer, true)
-end
+const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 
 config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 

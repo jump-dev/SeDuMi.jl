@@ -19,11 +19,6 @@ const MOIU = MOI.Utilities
 # supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
 # of the sets just listed above.
 
-const SF = Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.Zeros, MOI.Nonnegatives, MOI.SecondOrderCone,
-                 MOI.RotatedSecondOrderCone,
-                 MOI.PositiveSemidefiniteConeTriangle}
-
 mutable struct Solution
     x::Vector{Float64}
     y::Vector{Float64}
@@ -78,7 +73,7 @@ end
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
 
 function MOI.is_empty(optimizer::Optimizer)
-    !optimizer.maxsense && optimizer.data === nothing
+    return !optimizer.maxsense && optimizer.data === nothing
 end
 function MOI.empty!(optimizer::Optimizer)
     optimizer.maxsense = false
@@ -96,7 +91,13 @@ function MOI.supports(
     return true
 end
 
-MOI.supports_constraint(::Optimizer, ::Type{<:SF}, ::Type{<:SS}) = true
+function MOI.supports_constraint(
+    ::Optimizer, ::Type{MOI.VectorAffineFunction{Float64}},
+    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.SecondOrderCone,
+                   MOI.RotatedSecondOrderCone,
+                   MOI.PositiveSemidefiniteConeTriangle}})
+    return true
+end
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
@@ -260,13 +261,9 @@ function constraint_rows(optimizer::Optimizer,
 end
 
 function MOIU.load_constraint(optimizer::Optimizer, ci,
-                              f::MOI.VectorOfVariables, s)
-    return MOIU.load_constraint(optimizer, ci,
-                                MOI.VectorAffineFunction{Float64}(f), s)
-end
-function MOIU.load_constraint(optimizer::Optimizer, ci,
                               f::MOI.VectorAffineFunction,
                               s::MOI.AbstractVectorSet)
+    @assert MOI.output_dimension(f) == MOI.dimension(s)
     A = sparse(output_index.(f.terms), variable_index_value.(f.terms),
                coefficient.(f.terms))
     # `sparse` combines duplicates with `+` but does not remove zeros created so
