@@ -280,7 +280,7 @@ function constraint_rows(optimizer::Optimizer,
     return 1:optimizer.cone.nrows[constraint_offset(optimizer, ci)]
 end
 
-function MOIU.load_constraint(optimizer::Optimizer, ci,
+function MOIU.load_constraint(optimizer::Optimizer, ci::MOI.ConstraintIndex,
                               f::MOI.VectorAffineFunction,
                               s::MOI.AbstractVectorSet)
     @assert MOI.output_dimension(f) == MOI.dimension(s)
@@ -358,9 +358,9 @@ function MOI.optimize!(optimizer::Optimizer)
     if m == n
         # If m == n, SeDuMi thinks we give A'.
         # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
-        A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
+        A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V, m, n)
     else
-        A = sparse(optimizer.data.J, optimizer.data.I, optimizer.data.V)
+        A = sparse(optimizer.data.J, optimizer.data.I, optimizer.data.V, n, m)
     end
     c = optimizer.data.c
     objective_constant = optimizer.data.objective_constant
