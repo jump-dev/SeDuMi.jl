@@ -1,7 +1,7 @@
 name = "SeDuMi"
 uuid = "a895aaad-f784-5544-9392-bb281339c1b2"
 repo = "https://github.com/JuliaOpt/SeDuMi.jl.git"
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
