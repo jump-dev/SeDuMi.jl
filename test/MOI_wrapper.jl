@@ -29,8 +29,10 @@ config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 @testset "Unit" begin
     MOIT.unittest(bridged, config, [
+        # `TimeLimitSec` not supported.
+        "time_limit_sec",
         # Error using pretransfo (line 149)
-        # Size b mismatch<Paste>
+        # Size b mismatch
         "solve_unbounded_model",
         # Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
         "solve_qp_edge_cases",
