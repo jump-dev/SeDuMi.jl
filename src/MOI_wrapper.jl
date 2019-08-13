@@ -23,7 +23,9 @@ mutable struct Solution
     x::Vector{Float64}
     y::Vector{Float64}
     slack::Vector{Float64}
-    objval::Float64
+    objective_value::Float64
+    dual_objective_value::Float64
+    objective_constant::Float64
     info::Dict{String, Any}
 end
 
@@ -37,7 +39,7 @@ mutable struct ModelData
     J::Vector{Int} # List of cols of A'
     V::Vector{Float64} # List of coefficients of A
     c::Vector{Float64} # objective of SeDuMi primal/MOI dual
-    objconstant::Float64 # The objective is min c'x + objconstant
+    objective_constant::Float64 # The objective is min c'x + objective_constant
     b::Vector{Float64} # objective of SeDuMi dual/MOI primal
 end
 
@@ -63,14 +65,32 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     data::Union{Nothing, ModelData} # only non-`Nothing` between `MOI.copy_to`
                                     # and `MOI.optimize!`.
     sol::Union{Nothing, Solution}
-    options::Iterators.Pairs
-    function Optimizer(; options...)
-        new(ConeData(), false, nothing, nothing, options)
+    silent::Bool
+    options::Dict{Symbol, Any}
+    function Optimizer(; kwargs...)
+        optimizer = new(ConeData(), false, nothing, nothing, false, Dict{Symbol, Any}())
+        for (key, value) in kwargs
+            MOI.set(optimizer, MOI.RawParameter(key), value)
+        end
+        return optimizer
     end
 
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
+
+function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    optimizer.options[param.name] = value
+end
+function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    return optimizer.options[param.name]
+end
+
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+function MOI.set(optimizer::Optimizer, ::MOI.Silent, value::Bool)
+    optimizer.silent = value
+end
+MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.is_empty(optimizer::Optimizer)
     return !optimizer.maxsense && optimizer.data === nothing
@@ -260,7 +280,7 @@ function constraint_rows(optimizer::Optimizer,
     return 1:optimizer.cone.nrows[constraint_offset(optimizer, ci)]
 end
 
-function MOIU.load_constraint(optimizer::Optimizer, ci,
+function MOIU.load_constraint(optimizer::Optimizer, ci::MOI.ConstraintIndex,
                               f::MOI.VectorAffineFunction,
                               s::MOI.AbstractVectorSet)
     @assert MOI.output_dimension(f) == MOI.dimension(s)
@@ -326,7 +346,7 @@ function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
                    f::MOI.ScalarAffineFunction)
     c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
                           optimizer.data.n))
-    optimizer.data.objconstant = f.constant
+    optimizer.data.objective_constant = f.constant
     optimizer.data.b = optimizer.maxsense ? c0 : -c0
     return nothing
 end
@@ -338,25 +358,39 @@ function MOI.optimize!(optimizer::Optimizer)
     if m == n
         # If m == n, SeDuMi thinks we give A'.
         # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
-        A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V)
+        A = sparse(optimizer.data.I, optimizer.data.J, optimizer.data.V, m, n)
     else
-        A = sparse(optimizer.data.J, optimizer.data.I, optimizer.data.V)
+        A = sparse(optimizer.data.J, optimizer.data.I, optimizer.data.V, n, m)
     end
     c = optimizer.data.c
-    objconstant = optimizer.data.objconstant
+    objective_constant = optimizer.data.objective_constant
     b = optimizer.data.b
 
     # Allows GC to free optimizer.data before A is loaded to SeDuMi
     optimizer.data = nothing
 
-    x, y, info = sedumi(A, b, c, optimizer.cone.K; optimizer.options...)
+    options = optimizer.options
+    if optimizer.silent
+        options = copy(options)
+        options[:fid] = 0
+    end
 
-    objval = (optimizer.maxsense ? 1 : -1) * dot(b, y) + objconstant
-    optimizer.sol = Solution(x, y, c - A' * y, objval, info)
+    x, y, info = sedumi(A, b, c, optimizer.cone.K; options...)
+
+    objective_value = (optimizer.maxsense ? 1 : -1) * dot(b, y)
+    dual_objective_value = (optimizer.maxsense ? 1 : -1) * dot(c, x)
+    optimizer.sol = Solution(x, y, c - A' * y, objective_value,
+                             dual_objective_value, objective_constant, info)
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
     return optimizer.sol.info["cpusec"]
+end
+function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
+    return string("feasratio = ", optimizer.sol.info["feasratio"],
+                  ", pinf = ", optimizer.sol.info["pinf"],
+                  ", dinf = ", optimizer.sol.info["dinf"],
+                  "numerr = ", optimizer.sol.info["numerr"])
 end
 
 # Implements getter for result value and statuses
@@ -407,7 +441,20 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue) = optimizer.sol.objval
+function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
+    value = optimizer.sol.objective_value
+    if !MOIU.is_ray(MOI.get(optimizer, MOI.PrimalStatus()))
+        value += optimizer.sol.objective_constant
+    end
+    return value
+end
+function MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue)
+    value = optimizer.sol.dual_objective_value
+    if !MOIU.is_ray(MOI.get(optimizer, MOI.DualStatus()))
+        value += optimizer.sol.objective_constant
+    end
+    return value
+end
 
 function MOI.get(optimizer::Optimizer,
                  attr::Union{MOI.PrimalStatus, MOI.DualStatus})
