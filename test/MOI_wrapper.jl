@@ -34,7 +34,7 @@ config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
         # Error using pretransfo (line 149)
         # Size b mismatch
         "solve_unbounded_model",
-        # Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
+        # Need https://github.com/jump-dev/MathOptInterface.jl/issues/529
         "solve_qp_edge_cases",
         # Integer and ZeroOne sets are not supported
         "solve_integer_edge_cases", "solve_objbound_edge_cases",

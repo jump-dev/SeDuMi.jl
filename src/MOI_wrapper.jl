@@ -188,7 +188,7 @@ function MOIU.allocate_constraint(
 end
 
 # `dimension` -> `side_dimension`, see
-# http://www.juliaopt.org/MathOptInterface.jl/v0.8.1/apireference/#MathOptInterface.PositiveSemidefiniteConeTriangle
+# http://jump.dev/MathOptInterface.jl/v0.8.1/apireference/#MathOptInterface.PositiveSemidefiniteConeTriangle
 triangle_side_dimension(n) = div(isqrt(1 + 8n) - 1, 2)
 square_side_dimension(n) = isqrt(n)
 
@@ -197,7 +197,7 @@ function triangle_map(i::Integer, j::Integer)
     if i < j
         return triangle_map(j, i)
     else
-        # See http://www.juliaopt.org/MathOptInterface.jl/v0.8.1/apireference/#MathOptInterface.PositiveSemidefiniteConeTriangle
+        # See http://jump.dev/MathOptInterface.jl/v0.8.1/apireference/#MathOptInterface.PositiveSemidefiniteConeTriangle
         return div((i - 1) * i, 2) + j
     end
 end
