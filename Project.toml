@@ -1,6 +1,6 @@
 name = "SeDuMi"
 uuid = "a895aaad-f784-5544-9392-bb281339c1b2"
-repo = "https://github.com/JuliaOpt/SeDuMi.jl.git"
+repo = "https://github.com/jump-dev/SeDuMi.jl.git"
 version = "0.2.0"
 
 [deps]

@@ -4,9 +4,9 @@
 solver. It exports the `sedumi` function that is a thin wrapper on top of the
 `sedumi` MATLAB function and uses it to define the `SeDuMi.Optimizer` object
 that implements the solver-independent
-[MathOptInterface](https://github.com/JuliaOpt/MathOptInterface.jl) API.
+[MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl) API.
 
-To use it with [JuMP](https://github.com/JuliaOpt/JuMP.jl), simply do
+To use it with [JuMP](https://github.com/jump-dev/JuMP.jl), simply do
 ```julia
 using JuMP
 using SeDuMi
