@@ -70,7 +70,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     function Optimizer(; kwargs...)
         optimizer = new(ConeData(), false, nothing, nothing, false, Dict{Symbol, Any}())
         for (key, value) in kwargs
-            MOI.set(optimizer, MOI.RawParameter(key), value)
+            MOI.set(optimizer, MOI.RawParameter(String(key)), value)
         end
         return optimizer
     end
@@ -80,9 +80,23 @@ end
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    if !(param.name isa String)
+        Base.depwarn(
+            "passing `$(param.name)` to `MOI.RawParameter` as type " *
+            "`$(typeof(param.name))` is deprecated. Use a string instead.",
+            Symbol("MOI.set")
+        )
+    end
     optimizer.options[param.name] = value
 end
 function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    if !(param.name isa String)
+        Base.depwarn(
+            "passing `$(param.name)` to `MOI.RawParameter` as type " *
+            "`$(typeof(param.name))` is deprecated. Use a string instead.",
+            Symbol("MOI.set")
+        )
+    end
     return optimizer.options[param.name]
 end
 
@@ -284,12 +298,10 @@ function MOIU.load_constraint(optimizer::Optimizer, ci::MOI.ConstraintIndex,
                               f::MOI.VectorAffineFunction,
                               s::MOI.AbstractVectorSet)
     @assert MOI.output_dimension(f) == MOI.dimension(s)
-    A = sparse(output_index.(f.terms), variable_index_value.(f.terms),
-               coefficient.(f.terms))
-    # `sparse` combines duplicates with `+` but does not remove zeros created so
-    # we call `dropzeros!`.
-    dropzeros!(A)
-    I, J, V = findnz(A)
+    func = MOIU.canonical(f)
+    I = Int[output_index(term) for term in func.terms]
+    J = Int[variable_index_value(term) for term in func.terms]
+    V = Float64[-coefficient(term) for term in func.terms]
     offset = constraint_offset(optimizer, ci)
     rows = constraint_rows(s)
     optimizer.cone.nrows[offset] = length(rows)
@@ -305,7 +317,7 @@ function MOIU.load_constraint(optimizer::Optimizer, ci::MOI.ConstraintIndex,
     optimizer.data.c[i] = c
     append!(optimizer.data.I, offset .+ I)
     append!(optimizer.data.J, J)
-    append!(optimizer.data.V, -V)
+    append!(optimizer.data.V, V)
 end
 
 function MOIU.allocate_variables(optimizer::Optimizer, nvars::Integer)
@@ -441,14 +453,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
+function MOI.get(optimizer::Optimizer, attr::MOI.ObjectiveValue)
+    MOI.check_result_index_bounds(optimizer, attr)
     value = optimizer.sol.objective_value
     if !MOIU.is_ray(MOI.get(optimizer, MOI.PrimalStatus()))
         value += optimizer.sol.objective_constant
     end
     return value
 end
-function MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue)
+function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
+    MOI.check_result_index_bounds(optimizer, attr)
     value = optimizer.sol.dual_objective_value
     if !MOIU.is_ray(MOI.get(optimizer, MOI.DualStatus()))
         value += optimizer.sol.objective_constant
@@ -458,7 +472,7 @@ end
 
 function MOI.get(optimizer::Optimizer,
                  attr::Union{MOI.PrimalStatus, MOI.DualStatus})
-    if optimizer.sol isa Nothing
+    if attr.N > MOI.get(optimizer, MOI.ResultCount()) || optimizer.sol isa Nothing
         return MOI.NO_SOLUTION
     end
     pinf      = optimizer.sol.info["pinf"]
@@ -486,11 +500,13 @@ function MOI.get(optimizer::Optimizer,
         return MOI.NEARLY_FEASIBLE_POINT
     end
 end
-function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, vi::VI)
+function MOI.get(optimizer::Optimizer, attr::MOI.VariablePrimal, vi::VI)
+    MOI.check_result_index_bounds(optimizer, attr)
     optimizer.sol.y[vi.value]
 end
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintPrimal,
                  ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
+    MOI.check_result_index_bounds(optimizer, attr)
     offset = constraint_offset(optimizer, ci)
     rows = constraint_rows(optimizer, ci)
     primal = optimizer.sol.slack[offset .+ rows]
@@ -500,8 +516,9 @@ function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal,
     return primal
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual,
+function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
                  ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
+    MOI.check_result_index_bounds(optimizer, attr)
     offset = constraint_offset(optimizer, ci)
     rows = constraint_rows(optimizer, ci)
     dual = optimizer.sol.x[offset .+ rows]
