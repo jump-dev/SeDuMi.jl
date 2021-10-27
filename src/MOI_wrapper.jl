@@ -1,14 +1,17 @@
-using LinearAlgebra
-
 using MathOptInterface
 const MOI = MathOptInterface
+
+include("scaled_psd_cone_bridge.jl")
+
+import LinearAlgebra
 
 # SeDuMi solves the primal/dual pair
 # min c'x,       max b'y
 # s.t. Ax = b,   c - A'x ∈ K
 #       x ∈ K
-# where K is a product of Zeros, Nonnegatives, SecondOrderCone,
-# RotatedSecondOrderCone and PositiveSemidefiniteConeTriangle
+# where K is a product of `MOI.Zeros`, `MOI.Nonnegatives`,
+# `MOI.SecondOrderCone`, `MOI.RotatedSecondOrderCone` and
+# `SeDuMi.ScaledPSDCone`.
 
 MOI.Utilities.@product_of_sets(
     Cones,
@@ -16,7 +19,7 @@ MOI.Utilities.@product_of_sets(
     MOI.Nonnegatives,
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
-    MOI.PositiveSemidefiniteConeTriangle,
+    ScaledPSDCone,
 )
 
 const OptimizerCache = MOI.Utilities.GenericModel{
@@ -51,18 +54,30 @@ end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     cones::Union{Nothing,Cones{Float64}}
-                                    # and `MOI.optimize!`.
     sol::Union{Nothing, Solution}
     silent::Bool
     options::Dict{Symbol, Any}
     function Optimizer(; kwargs...)
         optimizer = new(nothing, nothing, false, Dict{Symbol, Any}())
+        if !isempty(kwargs)
+            @warn("""Passing optimizer attributes as keyword arguments to
+            SeDuMi.Optimizer is deprecated. Use
+                MOI.set(model, MOI.RawOptimizerAttribute("key"), value)
+            or
+                JuMP.set_optimizer_attribute(model, "key", value)
+            instead.
+            """)
+        end
         for (key, value) in kwargs
-            MOI.set(optimizer, MOI.RawParameter(String(key)), value)
+            MOI.set(optimizer, MOI.RawOptimizerAttribute(String(key)), value)
         end
         return optimizer
     end
 
+end
+
+function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
+    return [ScaledPSDConeBridge{Float64}]
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
@@ -80,11 +95,11 @@ end
 ### MOI.RawOptimizerAttribute
 ###
 
-function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
     optimizer.options[param.name] = value
 end
 
-function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+function MOI.get(optimizer::Optimizer, param::MOI.RawOptimizerAttribute)
     return optimizer.options[param.name]
 end
 
@@ -122,7 +137,7 @@ function MOI.supports_constraint(
         MOI.Nonnegatives,
         MOI.SecondOrderCone,
         MOI.RotatedSecondOrderCone,
-        MOI.PositiveSemidefiniteConeTriangle,
+        ScaledPSDCone,
     }},
 )
     return true
@@ -136,11 +151,11 @@ end
 
 function MOI.optimize!(
     dest::Optimizer,
-    src::OptimizerCache{T},
+    src::OptimizerCache,
 )
     MOI.empty!(dest)
     index_map = MOI.Utilities.identity_index_map(src)
-    Ac = src.model.constraints
+    Ac = src.constraints
     A = Ac.coefficients
 
     model_attributes = MOI.get(src, MOI.ListOfModelAttributesSet())
@@ -148,6 +163,7 @@ function MOI.optimize!(
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
     b = zeros(A.n)
     max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
+    objective_constant = 0.0
     if objective_function_attr in MOI.get(src, MOI.ListOfModelAttributesSet())
         obj = MOI.get(src, objective_function_attr)
         objective_constant = MOI.constant(obj)
@@ -158,16 +174,13 @@ function MOI.optimize!(
 
     # If m == n, SeDuMi thinks we give A'.
     # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
-    A = SparseMatrixCSC(A.colptr, A.rowval, A.nzval, A.m, A.n)
-    if m != n
-        A = A'
+    A = SparseMatrixCSC(A.m, A.n, A.colptr, A.rowval, -A.nzval)
+    if A.m != A.n
+        A = SparseMatrixCSC(A')
     end
-    c = optimizer.data.c
-    objective_constant = optimizer.data.objective_constant
-    b = optimizer.data.b
 
-    options = optimizer.options
-    if optimizer.silent
+    options = dest.options
+    if dest.silent
         options = copy(options)
         options[:fid] = 0
     end
@@ -175,23 +188,18 @@ function MOI.optimize!(
     K = Cone(
         Ac.sets.num_rows[1],
         Ac.sets.num_rows[2] - Ac.sets.num_rows[1],
-        _map_sets(MOI.dimension, Ab, MOI.SecondOrderCone),
-        _map_sets(MOI.dimension, Ab, MOI.RotatedSecondOrderCone),
-        _map_sets(MOI.side_dimension, Ab, MOI.PositiveSemidefiniteConeTriangle),
+        _map_sets(MOI.dimension, Ac, MOI.SecondOrderCone),
+        _map_sets(MOI.dimension, Ac, MOI.RotatedSecondOrderCone),
+        _map_sets(MOI.side_dimension, Ac, ScaledPSDCone),
     )
 
-    x, y, info = sedumi(
-        A,
-        b,
-        Ac.constants,
-        optimizer.cone.K;
-        options...,
-    )
+    c = Ac.constants
+    x, y, info = sedumi(A, b, c, K; options...)
 
     dest.cones = deepcopy(Ac.sets)
-    objective_value = (max_sense ? 1 : -1) * dot(b, y)
-    dual_objective_value = (max_sense ? 1 : -1) * dot(c, x)
-    optimizer.sol = Solution(
+    objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
+    dual_objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(c, x)
+    dest.sol = Solution(
         x,
         y,
         c - A' * y,
@@ -203,7 +211,14 @@ function MOI.optimize!(
     return index_map, false
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
+function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)
+    cache = OptimizerCache()
+    index_map = MOI.copy_to(cache, src)
+    MOI.optimize!(dest, cache)
+    return index_map, false
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec)
     return optimizer.sol.info["cpusec"]
 end
 function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
@@ -280,7 +295,7 @@ end
 
 function MOI.get(optimizer::Optimizer,
                  attr::Union{MOI.PrimalStatus, MOI.DualStatus})
-    if attr.N > MOI.get(optimizer, MOI.ResultCount()) || optimizer.sol isa Nothing
+    if attr.result_index > MOI.get(optimizer, MOI.ResultCount()) || optimizer.sol isa Nothing
         return MOI.NO_SOLUTION
     end
     pinf      = optimizer.sol.info["pinf"]
@@ -321,7 +336,7 @@ end
 function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
                  ci::MOI.ConstraintIndex)
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones, ci)]
+    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones, ci)]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1

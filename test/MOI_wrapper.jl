@@ -2,7 +2,7 @@ using Test
 
 using MathOptInterface
 const MOI = MathOptInterface
-const MOIT = MOI.Test
+const MOIT = MOI.DeprecatedTest
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
@@ -14,13 +14,8 @@ const OPTIMIZER = MOI.instantiate(OPTIMIZER_CONSTRUCTOR)
     @test MOI.get(OPTIMIZER, MOI.SolverName()) == "SeDuMi"
 end
 
-@testset "supports_allocate_load" begin
-    @test MOIU.supports_allocate_load(OPTIMIZER, false)
-    @test !MOIU.supports_allocate_load(OPTIMIZER, true)
-end
-
 const BRIDGED = MOI.instantiate(OPTIMIZER_CONSTRUCTOR, with_bridge_type=Float64)
-const CONFIG = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
+const CONFIG = MOIT.Config(atol=1e-4, rtol=1e-4)
 
 @testset "Unit" begin
     MOIT.unittest(BRIDGED, CONFIG, [
