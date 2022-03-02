@@ -28,3 +28,34 @@ but you first need to make sure that you satisfy the requirements of the
 [MATLAB.jl](https://github.com/JuliaInterop/MATLAB.jl) Julia package and that
 the SeDuMi software is installed in your
 [MATLAB™](http://www.mathworks.com/products/matlab/) installation.
+
+### Troubleshooting
+
+#### SeDuMi not in PATH
+
+If you get the error:
+```
+Undefined function or variable 'sedumi'.
+
+Error using save
+Variable 'jx_sedumi_arg_out_1' not found.
+
+ERROR: LoadError: MATLAB.MEngineError("failed to get variable jx_sedumi_arg_out_1 from MATLAB session")
+```
+The error means that we try to find the `sedumi` function with 1 output argument using the MATLAB C API but it wasn't found.
+This most likely means that you did not add SeDuMi to the MATLAB's path (i.e. the `toolbox/local/pathdef.m` file).
+
+If modifying `toolbox/local/pathdef.m` does not work, the following should work where `/path/to/sedumi/` is the directory where the `sedumi` folder is located:
+```julia
+julia> using MATLAB
+
+julia> cd("/path/to/sedumi/") do
+           mat"install_sedumi"
+       end
+```
+This should make `SeDuMi.jl` work for the Julia session in which this is run.
+Alternatively, run
+```julia
+julia> mat"savepath"
+```
+to make `SeDuMi.jl` work for future Julia sessions.

@@ -57,23 +57,14 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     sol::Union{Nothing, Solution}
     silent::Bool
     options::Dict{Symbol, Any}
-    function Optimizer(; kwargs...)
-        optimizer = new(nothing, nothing, false, Dict{Symbol, Any}())
-        if !isempty(kwargs)
-            @warn("""Passing optimizer attributes as keyword arguments to
-            SeDuMi.Optimizer is deprecated. Use
-                MOI.set(model, MOI.RawOptimizerAttribute("key"), value)
-            or
-                JuMP.set_optimizer_attribute(model, "key", value)
-            instead.
-            """)
-        end
-        for (key, value) in kwargs
-            MOI.set(optimizer, MOI.RawOptimizerAttribute(String(key)), value)
-        end
-        return optimizer
+    function Optimizer()
+        return new(nothing, nothing, false, Dict{Symbol, Any}())
     end
 
+end
+
+function MOI.default_cache(::Optimizer, ::Type{Float64})
+    return MOI.Utilities.UniversalFallback(OptimizerCache())
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
@@ -209,6 +200,14 @@ function MOI.optimize!(
         info,
     )
     return index_map, false
+end
+
+function MOI.optimize!(
+    dest::Optimizer,
+    src::MOI.Utilities.UniversalFallback{OptimizerCache},
+)
+    MOI.Utilities.throw_unsupported(src)
+    return MOI.optimize!(dest, src.model)
 end
 
 function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)
