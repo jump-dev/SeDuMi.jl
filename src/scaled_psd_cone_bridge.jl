@@ -46,7 +46,7 @@ function MOI.Bridges.inverse_map_set(
     return MOI.PositiveSemidefiniteConeTriangle(set.side_dimension)
 end
 
-# Map ConstraintFunction from MOI -> SCS
+# Map ConstraintFunction from MOI -> SeDuMi
 function MOI.Bridges.map_function(
     BT::Type{<:ScaledPSDConeBridge{T}},
     func::MOI.VectorOfVariables,
@@ -69,21 +69,21 @@ function MOI.Bridges.map_function(
     return MOI.VectorAffineFunction(terms, constants)
 end
 
-# Used to map the ConstraintPrimal from SCS -> MOI
+# Used to map the ConstraintPrimal from SeDuMi -> MOI
 function MOI.Bridges.inverse_map_function(::Type{<:ScaledPSDConeBridge}, square)
     triangle = square_to_triangle(square)
     unscale_coefficients!(triangle)
     return triangle
 end
 
-# Used to map the ConstraintDual from SCS -> MOI
+# Used to map the ConstraintDual from SeDuMi -> MOI
 function MOI.Bridges.adjoint_map_function(::Type{<:ScaledPSDConeBridge}, square)
     triangle = square_to_triangle(square)
     n = isqrt(length(square))
     for i in 1:n, j in 1:(i-1)
         # Add lower diagonal dual. It should be equal to upper diagonal dual
         # but `unscale_coefficients` will divide by 2 so it will do the mean
-        triangle[triangle_map(i, j)] += square[square_map(i, j, n)]
+        triangle[MOI.Utilities.trimap(i, j)] += square[square_map(i, j, n)]
     end
     unscale_coefficients!(triangle)
     return triangle
@@ -94,15 +94,6 @@ end
 triangle_side_dimension(n) = div(isqrt(1 + 8n) - 1, 2)
 square_side_dimension(n) = isqrt(n)
 
-# Matrix indices -> Index in vectorized form
-function triangle_map(i::Integer, j::Integer)
-    if i < j
-        return triangle_map(j, i)
-    else
-        # See http://jump.dev/MathOptInterface.jl/v0.8.1/apireference/#MathOptInterface.PositiveSemidefiniteConeTriangle
-        return div((i - 1) * i, 2) + j
-    end
-end
 function square_map(i::Integer, j::Integer, n::Integer)
     if i < j
         return square_map(j, i, n)
@@ -123,14 +114,14 @@ function square_to_triangle(x, n = square_side_dimension(length(x)))
         x,
         n,
         (i, j) -> square_map(i, j, n),
-        triangle_map,
+        MOI.Utilities.trimap,
     )
 end
 function triangle_to_square(x, n = triangle_side_dimension(length(x)))
     return copy_upper_triangle(
         x,
         n,
-        triangle_map,
+        MOI.Utilities.trimap,
         (i, j) -> square_map(i, j, n),
     )
 end

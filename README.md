@@ -10,11 +10,11 @@ To use it with [JuMP](https://github.com/jump-dev/JuMP.jl), simply do
 ```julia
 using JuMP
 using SeDuMi
-model = Model(with_optimizer(SeDuMi.Optimizer))
+model = Model(SeDuMi.Optimizer)
 ```
 To suppress output, do
 ```julia
-model = Model(with_optimizer(SeDuMi.Optimizer, fid=0))
+model = Model(optimizer_with_attributes(SeDuMi.Optimizer, fid=0))
 ```
 
 ## Installation
