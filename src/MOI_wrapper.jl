@@ -86,11 +86,12 @@ end
 ###
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
-    return optimizer.options[param.name] = value
+    optimizer.options[Symbol(param.name)] = value
+    return
 end
 
 function MOI.get(optimizer::Optimizer, param::MOI.RawOptimizerAttribute)
-    return optimizer.options[param.name]
+    return optimizer.options[Symbol(param.name)]
 end
 
 ###

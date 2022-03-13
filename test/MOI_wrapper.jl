@@ -21,6 +21,12 @@ function test_solver_name()
     @test MOI.get(SeDuMi.Optimizer(), MOI.SolverName()) == "SeDuMi"
 end
 
+function test_options()
+    optimizer = SeDuMi.Optimizer()
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("fid"), 0)
+    @test MOI.get(optimizer, MOI.RawOptimizerAttribute("fid")) == 0
+end
+
 function test_runtests()
     model = MOI.Utilities.CachingOptimizer(
         MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
