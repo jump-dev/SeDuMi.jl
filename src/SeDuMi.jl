@@ -15,7 +15,7 @@ mutable struct Cone
     s::Vector{Float64} # list of semidefinite constraints
 end
 Cone(f::Real, l::Real) = Cone(f, l, Float64[], Float64[], Float64[])
-dimension(K::Cone) = K.f + K.l + sum(K.q) + sum(K.r) + sum(K.s.^2)
+dimension(K::Cone) = K.f + K.l + sum(K.q) + sum(K.r) + sum(K.s .^ 2)
 
 to_vec(x::Vector) = x
 to_vec(x::Float64) = [x]
@@ -31,11 +31,14 @@ end
 #
 # Note, if `A` is square then SeDuMi assumes that `A'` is passed instead,
 # see https://github.com/sqlp/sedumi/issues/42
-function sedumi(A::Union{Matrix{Float64}, SparseMatrixCSC{Float64}},
-                b::Vector{Float64}, c::Vector{Float64},
-                K::Cone = Cone(0, size(A, 2));
-                kws...)
-    pars = Dict{String, Any}(string(key) => value for (key, value) in kws)
+function sedumi(
+    A::Union{Matrix{Float64},SparseMatrixCSC{Float64}},
+    b::Vector{Float64},
+    c::Vector{Float64},
+    K::Cone = Cone(0, size(A, 2));
+    kws...,
+)
+    pars = Dict{String,Any}(string(key) => value for (key, value) in kws)
     @assert size(A, 1) == length(b)
     @assert size(A, 2) == length(c)
     @assert size(A, 2) == dimension(K)
