@@ -13,6 +13,10 @@ import LinearAlgebra
 # `MOI.SecondOrderCone`, `MOI.RotatedSecondOrderCone` and
 # `SeDuMi.ScaledPSDCone`.
 
+# This wrapper copies the MOI problem to the SeDuMi dual so the natively
+# supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
+# of the sets just listed above.
+
 MOI.Utilities.@product_of_sets(
     Cones,
     MOI.Zeros,
@@ -38,10 +42,6 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     },
 }
 
-# This wrapper copies the MOI problem to the SeDuMi dual so the natively
-# supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
-# of the sets just listed above.
-
 mutable struct Solution
     x::Vector{Float64}
     y::Vector{Float64}
@@ -49,18 +49,17 @@ mutable struct Solution
     objective_value::Float64
     dual_objective_value::Float64
     objective_constant::Float64
-    info::Dict{String, Any}
+    info::Dict{String,Any}
 end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
     cones::Union{Nothing,Cones{Float64}}
-    sol::Union{Nothing, Solution}
+    sol::Union{Nothing,Solution}
     silent::Bool
-    options::Dict{Symbol, Any}
+    options::Dict{Symbol,Any}
     function Optimizer()
-        return new(nothing, nothing, false, Dict{Symbol, Any}())
+        return new(nothing, nothing, false, Dict{Symbol,Any}())
     end
-
 end
 
 function MOI.default_cache(::Optimizer, ::Type{Float64})
@@ -87,7 +86,7 @@ end
 ###
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
-    optimizer.options[param.name] = value
+    return optimizer.options[param.name] = value
 end
 
 function MOI.get(optimizer::Optimizer, param::MOI.RawOptimizerAttribute)
@@ -101,7 +100,7 @@ end
 MOI.supports(::Optimizer, ::MOI.Silent) = true
 
 function MOI.set(optimizer::Optimizer, ::MOI.Silent, value::Bool)
-    optimizer.silent = value
+    return optimizer.silent = value
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
@@ -123,13 +122,15 @@ end
 function MOI.supports_constraint(
     ::Optimizer,
     ::Type{MOI.VectorAffineFunction{Float64}},
-    ::Type{<:Union{
-        MOI.Zeros,
-        MOI.Nonnegatives,
-        MOI.SecondOrderCone,
-        MOI.RotatedSecondOrderCone,
-        ScaledPSDCone,
-    }},
+    ::Type{
+        <:Union{
+            MOI.Zeros,
+            MOI.Nonnegatives,
+            MOI.SecondOrderCone,
+            MOI.RotatedSecondOrderCone,
+            ScaledPSDCone,
+        },
+    },
 )
     return true
 end
@@ -140,10 +141,7 @@ function _map_sets(f, sets, ::Type{S}) where {S}
     return Int[f(MOI.get(sets, MOI.ConstraintSet(), ci)) for ci in cis]
 end
 
-function MOI.optimize!(
-    dest::Optimizer,
-    src::OptimizerCache,
-)
+function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     index_map = MOI.Utilities.identity_index_map(src)
     Ac = src.constraints
@@ -221,10 +219,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec)
     return optimizer.sol.info["cpusec"]
 end
 function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
-    return string("feasratio = ", optimizer.sol.info["feasratio"],
-                  ", pinf = ", optimizer.sol.info["pinf"],
-                  ", dinf = ", optimizer.sol.info["dinf"],
-                  "numerr = ", optimizer.sol.info["numerr"])
+    return string(
+        "feasratio = ",
+        optimizer.sol.info["feasratio"],
+        ", pinf = ",
+        optimizer.sol.info["pinf"],
+        ", dinf = ",
+        optimizer.sol.info["dinf"],
+        "numerr = ",
+        optimizer.sol.info["numerr"],
+    )
 end
 
 # Implements getter for result value and statuses
@@ -243,9 +247,9 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     if optimizer.sol isa Nothing
         return MOI.OPTIMIZE_NOT_CALLED
     end
-    pinf      = optimizer.sol.info["pinf"]
-    dinf      = optimizer.sol.info["dinf"]
-    numerr    = optimizer.sol.info["numerr"]
+    pinf = optimizer.sol.info["pinf"]
+    dinf = optimizer.sol.info["dinf"]
+    numerr = optimizer.sol.info["numerr"]
     if numerr == 2
         return MOI.NUMERICAL_ERROR
     end
@@ -292,14 +296,17 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
     return value
 end
 
-function MOI.get(optimizer::Optimizer,
-                 attr::Union{MOI.PrimalStatus, MOI.DualStatus})
-    if attr.result_index > MOI.get(optimizer, MOI.ResultCount()) || optimizer.sol isa Nothing
+function MOI.get(
+    optimizer::Optimizer,
+    attr::Union{MOI.PrimalStatus,MOI.DualStatus},
+)
+    if attr.result_index > MOI.get(optimizer, MOI.ResultCount()) ||
+       optimizer.sol isa Nothing
         return MOI.NO_SOLUTION
     end
-    pinf      = optimizer.sol.info["pinf"]
-    dinf      = optimizer.sol.info["dinf"]
-    numerr    = optimizer.sol.info["numerr"]
+    pinf = optimizer.sol.info["pinf"]
+    dinf = optimizer.sol.info["dinf"]
+    numerr = optimizer.sol.info["numerr"]
     if numerr == 2
         return MOI.UNKNOWN_RESULT_STATUS
     end
@@ -322,18 +329,28 @@ function MOI.get(optimizer::Optimizer,
         return MOI.NEARLY_FEASIBLE_POINT
     end
 end
-function MOI.get(optimizer::Optimizer, attr::MOI.VariablePrimal, vi::MOI.VariableIndex)
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.VariablePrimal,
+    vi::MOI.VariableIndex,
+)
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.y[vi.value]
 end
-function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintPrimal,
-                 ci::MOI.ConstraintIndex)
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex,
+)
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones, ci)]
 end
 
-function MOI.get(optimizer::Optimizer, attr::MOI.ConstraintDual,
-                 ci::MOI.ConstraintIndex)
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex,
+)
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones, ci)]
 end

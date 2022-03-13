@@ -47,11 +47,17 @@ function MOI.Bridges.inverse_map_set(
 end
 
 # Map ConstraintFunction from MOI -> SCS
-function MOI.Bridges.map_function(BT::Type{<:ScaledPSDConeBridge{T}}, func::MOI.VectorOfVariables) where {T}
+function MOI.Bridges.map_function(
+    BT::Type{<:ScaledPSDConeBridge{T}},
+    func::MOI.VectorOfVariables,
+) where {T}
     new_f = MOI.Utilities.operate(*, Float64, 1.0, func)
     return MOI.Bridges.map_function(BT, new_f)
 end
-function MOI.Bridges.map_function(::Type{<:ScaledPSDConeBridge}, f::MOI.VectorAffineFunction)
+function MOI.Bridges.map_function(
+    ::Type{<:ScaledPSDConeBridge},
+    f::MOI.VectorAffineFunction,
+)
     n = MOI.output_dimension(f)
     d = MOI.Utilities.side_dimension_for_vectorized_dimension(n)
     constants = copy(f.constants)
@@ -112,24 +118,27 @@ function copy_upper_triangle(x, n, map_from, map_to)
     end
     return y
 end
-function square_to_triangle(x, n=square_side_dimension(length(x)))
-    return copy_upper_triangle(x, n, (i, j) -> square_map(i, j, n),
-                               triangle_map)
+function square_to_triangle(x, n = square_side_dimension(length(x)))
+    return copy_upper_triangle(
+        x,
+        n,
+        (i, j) -> square_map(i, j, n),
+        triangle_map,
+    )
 end
-function triangle_to_square(x, n=triangle_side_dimension(length(x)))
-    return copy_upper_triangle(x, n, triangle_map, (i, j) -> square_map(i, j, n))
+function triangle_to_square(x, n = triangle_side_dimension(length(x)))
+    return copy_upper_triangle(
+        x,
+        n,
+        triangle_map,
+        (i, j) -> square_map(i, j, n),
+    )
 end
 
-function triangle_to_square_indices!(
-    x::Vector{<:MOI.VectorAffineTerm},
-    n,
-)
+function triangle_to_square_indices!(x::Vector{<:MOI.VectorAffineTerm}, n)
     map = square_to_triangle(1:n^2, n)
     for i in eachindex(x)
-        x[i] = MOI.VectorAffineTerm(
-            map[x[i].output_index],
-            x[i].scalar_term,
-        )
+        x[i] = MOI.VectorAffineTerm(map[x[i].output_index], x[i].scalar_term)
     end
 end
 
