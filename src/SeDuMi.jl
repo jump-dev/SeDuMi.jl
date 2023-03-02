@@ -8,13 +8,13 @@ export sedumi
 # The fields should be integer values but the type should be `Float64` to work
 # with SeDuMi
 mutable struct Cone
-   	f::Float64 # number of free primal variables / linear dual equality constraints
-   	l::Float64 # length of LP cone
-   	q::Vector{Float64} # list of second-order cone dimensions
-   	r::Vector{Float64} # list of rotated second-order cone dimensions
-   	s::Vector{Float64} # list of semidefinite cone dimensions
-   	scomplex::Vector{Float64} #list of semidefinite cones that are Hermitian PSD instead of Symmetric PSD
-   	ycomplex::Vector{Float64} #list of constraints on A*x that should also act on the imaginary part
+    f::Float64 # number of free primal variables / linear dual equality constraints
+    l::Float64 # length of LP cone
+    q::Vector{Float64} # list of second-order cone dimensions
+    r::Vector{Float64} # list of rotated second-order cone dimensions
+    s::Vector{Float64} # list of semidefinite cone dimensions
+    scomplex::Vector{Float64} #list of semidefinite cones that are Hermitian PSD instead of Symmetric PSD
+    ycomplex::Vector{Float64} #list of constraints on A*x that should also act on the imaginary part
     xcomplex::Vector{Float64} #list of components of f,l,q,r blocks allowed to be complex
 end
 Cone(f::Real, l::Real, q::Vector{<:Real}, r::Vector{<:Real}, s::Vector{<:Real}) = Cone(f, l, q, r, s, Float64[], Float64[], Float64[])
