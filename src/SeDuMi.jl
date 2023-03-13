@@ -10,15 +10,28 @@ export sedumi
 mutable struct Cone
     f::Float64 # number of free primal variables / linear dual equality constraints
     l::Float64 # length of LP cone
-    q::Vector{Float64} # list of second-order cone dimension
-    r::Vector{Float64} # list of rotated second-order cone dimension
-    s::Vector{Float64} # list of semidefinite constraints
+    q::Vector{Float64} # list of second-order cone dimensions
+    r::Vector{Float64} # list of rotated second-order cone dimensions
+    s::Vector{Float64} # list of semidefinite cone dimensions
+    scomplex::Vector{Float64} #list of semidefinite cones that are Hermitian PSD instead of Symmetric PSD
+    ycomplex::Vector{Float64} #list of constraints on A*x that should also act on the imaginary part
+    xcomplex::Vector{Float64} #list of components of f,l,q,r blocks allowed to be complex
+end
+function Cone(
+    f::Real,
+    l::Real,
+    q::Vector{<:Real},
+    r::Vector{<:Real},
+    s::Vector{<:Real},
+)
+    return Cone(f, l, q, r, s, Float64[], Float64[], Float64[])
 end
 Cone(f::Real, l::Real) = Cone(f, l, Float64[], Float64[], Float64[])
 dimension(K::Cone) = K.f + K.l + sum(K.q) + sum(K.r) + sum(K.s .^ 2)
 
 to_vec(x::Vector) = x
 to_vec(x::Float64) = [x]
+to_vec(x::ComplexF64) = [x]
 function to_vec(x::AbstractMatrix)
     @assert isempty(x) || isone(size(x, 2))
     return vec(x)
@@ -32,9 +45,14 @@ end
 # Note, if `A` is square then SeDuMi assumes that `A'` is passed instead,
 # see https://github.com/sqlp/sedumi/issues/42
 function sedumi(
-    A::Union{Matrix{Float64},SparseMatrixCSC{Float64}},
-    b::Vector{Float64},
-    c::Vector{Float64},
+    A::Union{
+        Matrix{Float64},
+        SparseMatrixCSC{Float64},
+        Matrix{ComplexF64},
+        SparseMatrixCSC{ComplexF64},
+    },
+    b::Union{Vector{Float64},Vector{ComplexF64}},
+    c::Union{Vector{Float64},Vector{ComplexF64}},
     K::Cone = Cone(0, size(A, 2));
     kws...,
 )
