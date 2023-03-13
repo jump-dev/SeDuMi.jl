@@ -17,7 +17,15 @@ mutable struct Cone
     ycomplex::Vector{Float64} #list of constraints on A*x that should also act on the imaginary part
     xcomplex::Vector{Float64} #list of components of f,l,q,r blocks allowed to be complex
 end
-Cone(f::Real, l::Real, q::Vector{<:Real}, r::Vector{<:Real}, s::Vector{<:Real}) = Cone(f, l, q, r, s, Float64[], Float64[], Float64[])
+function Cone(
+    f::Real,
+    l::Real,
+    q::Vector{<:Real},
+    r::Vector{<:Real},
+    s::Vector{<:Real},
+)
+    return Cone(f, l, q, r, s, Float64[], Float64[], Float64[])
+end
 Cone(f::Real, l::Real) = Cone(f, l, Float64[], Float64[], Float64[])
 dimension(K::Cone) = K.f + K.l + sum(K.q) + sum(K.r) + sum(K.s .^ 2)
 
@@ -37,7 +45,12 @@ end
 # Note, if `A` is square then SeDuMi assumes that `A'` is passed instead,
 # see https://github.com/sqlp/sedumi/issues/42
 function sedumi(
-    A::Union{Matrix{Float64},SparseMatrixCSC{Float64},Matrix{ComplexF64},SparseMatrixCSC{ComplexF64}},
+    A::Union{
+        Matrix{Float64},
+        SparseMatrixCSC{Float64},
+        Matrix{ComplexF64},
+        SparseMatrixCSC{ComplexF64},
+    },
     b::Union{Vector{Float64},Vector{ComplexF64}},
     c::Union{Vector{Float64},Vector{ComplexF64}},
     K::Cone = Cone(0, size(A, 2));
