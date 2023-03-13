@@ -20,9 +20,9 @@ end
 function Cone(
     f::Real,
     l::Real,
-    q::Vector{<:Real},
-    r::Vector{<:Real},
-    s::Vector{<:Real},
+    q::Vector,
+    r::Vector,
+    s::Vector,
 )
     return Cone(f, l, q, r, s, Float64[], Float64[], Float64[])
 end
