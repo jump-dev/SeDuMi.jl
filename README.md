@@ -16,11 +16,11 @@ of SeDuMi.
 
 `SeDuMi.jl` is licensed under the [MIT License](https://github.com/jump-dev/SeDuMi.jl/blob/master/LICENSE.md).
 
-The underlying solver,[sqlp/sedumi](https://github.com/sqlp/sedumi) is licensed
+The underlying solver, [sqlp/sedumi](https://github.com/sqlp/sedumi) is licensed
 under the [GPL v2 license](https://github.com/sqlp/sedumi/blob/master/COPYING).
 
 In addition, SeDuMi requires an installation of MATLAB, which is a closed-source
-commercial product for which you must [purchase a license](https://www.mathworks.com/products/matlab.html).
+commercial product for which you must [obtain a license](https://www.mathworks.com/products/matlab.html).
 
 ## Use with JuMP
 
