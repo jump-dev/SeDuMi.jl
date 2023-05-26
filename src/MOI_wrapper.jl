@@ -2,6 +2,7 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 include("scaled_psd_cone_bridge.jl")
+include("scaled_hermitian_psd_cone_bridge.jl")
 
 import LinearAlgebra
 
@@ -67,7 +68,7 @@ function MOI.default_cache(::Optimizer, ::Type{Float64})
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
-    return [ScaledPSDConeBridge{Float64}]
+    return [ScaledPSDConeBridge{Float64}, ScaledHermitianPSDConeBridge{Float64}]
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
@@ -132,6 +133,14 @@ function MOI.supports_constraint(
             ScaledPSDCone,
         },
     },
+)
+    return true
+end
+
+function MOI.supports_constraint(
+    ::Optimizer,
+    ::Type{MOI.VectorAffineFunction{ComplexF64}},
+    ::Type{ScaledPSDCone}
 )
     return true
 end

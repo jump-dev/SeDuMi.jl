@@ -136,7 +136,8 @@ end
 _row(i, t::MOI.VectorAffineTerm) = t.output_index
 _row(i, β) = i
 
-_prod(α, t::MOI.VectorAffineTerm) = MOI.Utilities.operate_term(*, α, t)
+_prod(α, t::MOI.VectorAffineTerm{Float64}) = MOI.Utilities.operate_term(*, α, t)
+_prod(α, t::MOI.VectorAffineTerm{ComplexF64}) = MOI.Utilities.operate_term(*, ComplexF64(α), t)
 _prod(α, β) = α * β
 
 # Scale coefficients depending on rows index on symmetric packed upper triangular form
