@@ -5,7 +5,10 @@ struct ScaledHermitianPSDConeBridge{T,G} <: MOI.Bridges.Constraint.SetMapBridge{
     MOI.VectorAffineFunction{T},
     G,
 }
-    constraint::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64},ScaledPSDCone}
+    constraint::MOI.ConstraintIndex{
+        MOI.VectorAffineFunction{ComplexF64},
+        ScaledPSDCone,
+    }
 end
 
 function MOI.Bridges.Constraint.concrete_bridge_type(
@@ -56,14 +59,20 @@ function MOI.Bridges.map_function(
 end
 
 # Used to map the ConstraintPrimal from SeDuMi -> MOI
-function MOI.Bridges.inverse_map_function(::Type{<:ScaledHermitianPSDConeBridge}, square)
+function MOI.Bridges.inverse_map_function(
+    ::Type{<:ScaledHermitianPSDConeBridge},
+    square,
+)
     triangle = square_to_triangle(square)
     unscale_coefficients!(triangle)
     return triangle
 end
 
 # Used to map the ConstraintDual from SeDuMi -> MOI
-function MOI.Bridges.adjoint_map_function(::Type{<:ScaledHermitianPSDConeBridge}, square)
+function MOI.Bridges.adjoint_map_function(
+    ::Type{<:ScaledHermitianPSDConeBridge},
+    square,
+)
     triangle = square_to_triangle(square)
     n = isqrt(length(square))
     for i in 1:n, j in 1:(i-1)
@@ -75,28 +84,36 @@ function MOI.Bridges.adjoint_map_function(::Type{<:ScaledHermitianPSDConeBridge}
     return triangle
 end
 
-
 function hermitian_to_complex_triangle(x, n)
-    triangle_size = div(n*(n+1),2)
+    triangle_size = div(n * (n + 1), 2)
     y = ComplexF64.(x[1:triangle_size])
     for i in 1:n-1, j in i+1:n
-        y[MOI.Utilities.trimap(i, j)] += im*x[triangle_size + MOI.Utilities.trimap(i, j-1)]
+        y[MOI.Utilities.trimap(i, j)] +=
+            im * x[triangle_size+MOI.Utilities.trimap(i, j - 1)]
     end
     return y
 end
 
-function hermitian_to_complex_triangle_indices(x::Vector{<:MOI.VectorAffineTerm}, n)
-    triangle_size = div(n*(n+1),2)
-    map = zeros(Int64, div(n*(n-1),2))
+function hermitian_to_complex_triangle_indices(
+    x::Vector{<:MOI.VectorAffineTerm},
+    n,
+)
+    triangle_size = div(n * (n + 1), 2)
+    map = zeros(Int64, div(n * (n - 1), 2))
     for i in 1:n-1, j in i+1:n
-        map[MOI.Utilities.trimap(i, j-1)] = MOI.Utilities.trimap(i, j)
+        map[MOI.Utilities.trimap(i, j - 1)] = MOI.Utilities.trimap(i, j)
     end
-    x = convert(Vector{MOI.VectorAffineTerm{ComplexF64}},x)
+    x = convert(Vector{MOI.VectorAffineTerm{ComplexF64}}, x)
     for i in eachindex(x)
         if x[i].output_index >= triangle_size + 1
-            x[i] = MOI.VectorAffineTerm(map[x[i].output_index-triangle_size], MOI.ScalarAffineTerm(im * x[i].scalar_term.coefficient, x[i].scalar_term.variable))
+            x[i] = MOI.VectorAffineTerm(
+                map[x[i].output_index-triangle_size],
+                MOI.ScalarAffineTerm(
+                    im * x[i].scalar_term.coefficient,
+                    x[i].scalar_term.variable,
+                ),
+            )
         end
     end
     return x
 end
-

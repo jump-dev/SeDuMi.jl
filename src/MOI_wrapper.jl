@@ -166,7 +166,7 @@ end
 function MOI.supports_constraint(
     ::Optimizer,
     ::Type{MOI.VectorAffineFunction{ComplexF64}},
-    ::Type{ScaledPSDCone}
+    ::Type{ScaledPSDCone},
 )
     return true
 end
