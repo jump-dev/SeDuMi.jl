@@ -29,7 +29,7 @@ MOI.Utilities.@struct_of_constraints_by_function_types(
 
 MOI.Utilities.@product_of_sets(
     ComplexCones,
-    MOI.HermitianPositiveSemidefiniteConeTriangle,
+    ScaledPSDCone,
 )
 
 MOI.Utilities.@product_of_sets(
@@ -47,14 +47,14 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     MOI.Utilities.VariablesContainer{Float64},
     ComplexOrReal{Float64}{
         MOI.Utilities.MatrixOfConstraints{
-            Float64,
+            ComplexF64,
             MOI.Utilities.MutableSparseMatrixCSC{
-                Float64,
+                ComplexF64,
                 Int,
                 MOI.Utilities.OneBasedIndexing,
             },
-            Vector{Float64},
-            ComplexCones{Float64},
+            Vector{ComplexF64},
+            ComplexCones{ComplexF64},
         },
         MOI.Utilities.MatrixOfConstraints{
             Float64,
@@ -180,13 +180,22 @@ end
 function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     index_map = MOI.Utilities.identity_index_map(src)
-    Ac = src.constraints
-    A = Ac.coefficients
+    Ac_complex = MOI.Utilities.constraints(
+        src.constraints,
+        MOI.VectorAffineFunction{ComplexF64},
+        ScaledPSDCone,
+    )
+    Ac_real = MOI.Utilities.constraints(
+        src.constraints,
+        MOI.VectorAffineFunction{Float64},
+        ScaledPSDCone,
+    )
+    A_real = Ac_real.coefficients
 
     model_attributes = MOI.get(src, MOI.ListOfModelAttributesSet())
     objective_function_attr =
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    b = zeros(A.n)
+    b = zeros(A_real.n)
     max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     objective_constant = 0.0
     if objective_function_attr in MOI.get(src, MOI.ListOfModelAttributesSet())
@@ -197,9 +206,10 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         end
     end
 
+    # TODO add complex
+    A = SparseMatrixCSC(A_real.m, A_real.n, A_real.colptr, A_real.rowval, -A_real.nzval)
     # If m == n, SeDuMi thinks we give A'.
     # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
-    A = SparseMatrixCSC(A.m, A.n, A.colptr, A.rowval, -A.nzval)
     if A.m != A.n
         A = SparseMatrixCSC(A')
     end
@@ -211,17 +221,18 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     end
 
     K = Cone(
-        Ac.sets.num_rows[1],
-        Ac.sets.num_rows[2] - Ac.sets.num_rows[1],
-        _map_sets(MOI.dimension, Ac, MOI.SecondOrderCone),
-        _map_sets(MOI.dimension, Ac, MOI.RotatedSecondOrderCone),
-        _map_sets(MOI.side_dimension, Ac, ScaledPSDCone),
+        Ac_real.sets.num_rows[1],
+        Ac_real.sets.num_rows[2] - Ac_real.sets.num_rows[1],
+        _map_sets(MOI.dimension, Ac_real, MOI.SecondOrderCone),
+        _map_sets(MOI.dimension, Ac_real, MOI.RotatedSecondOrderCone),
+        _map_sets(MOI.side_dimension, Ac_real, ScaledPSDCone),
     )
 
-    c = Ac.constants
+    c_real = Ac_real.constants
+    c = c_real # TODO add complex
     x, y, info = sedumi(A, b, c, K; options...)
 
-    dest.cones = deepcopy(Ac.sets)
+    dest.cones = deepcopy(Ac_real.sets)
     objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
     dual_objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(c, x)
     dest.sol = Solution(
