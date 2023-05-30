@@ -18,6 +18,20 @@ import LinearAlgebra
 # supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
 # of the sets just listed above.
 
+const ComplexAff = MOI.VectorAffineFunction{Complex{Float64}}
+const RealAff = MOI.VectorAffineFunction{Float64}
+
+MOI.Utilities.@struct_of_constraints_by_function_types(
+    ComplexOrReal,
+    ComplexAff,
+    RealAff,
+)
+
+MOI.Utilities.@product_of_sets(
+    ComplexCones,
+    MOI.HermitianPositiveSemidefiniteConeTriangle,
+)
+
 MOI.Utilities.@product_of_sets(
     Cones,
     MOI.Zeros,
@@ -31,15 +45,27 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     Float64,
     MOI.Utilities.ObjectiveContainer{Float64},
     MOI.Utilities.VariablesContainer{Float64},
-    MOI.Utilities.MatrixOfConstraints{
-        Float64,
-        MOI.Utilities.MutableSparseMatrixCSC{
+    ComplexOrReal{Float64}{
+        MOI.Utilities.MatrixOfConstraints{
             Float64,
-            Int,
-            MOI.Utilities.OneBasedIndexing,
+            MOI.Utilities.MutableSparseMatrixCSC{
+                Float64,
+                Int,
+                MOI.Utilities.OneBasedIndexing,
+            },
+            Vector{Float64},
+            ComplexCones{Float64},
         },
-        Vector{Float64},
-        Cones{Float64},
+        MOI.Utilities.MatrixOfConstraints{
+            Float64,
+            MOI.Utilities.MutableSparseMatrixCSC{
+                Float64,
+                Int,
+                MOI.Utilities.OneBasedIndexing,
+            },
+            Vector{Float64},
+            Cones{Float64},
+        },
     },
 }
 
