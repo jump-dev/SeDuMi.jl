@@ -8,7 +8,7 @@ import LinearAlgebra
 
 # SeDuMi solves the primal/dual pair
 # min c'x,       max b'y
-# s.t. Ax = b,   c - A'x ∈ K
+# s.t. Ax = b,   c - A'y ∈ K
 #       x ∈ K
 # where K is a product of `MOI.Zeros`, `MOI.Nonnegatives`,
 # `MOI.SecondOrderCone`, `MOI.RotatedSecondOrderCone` and
@@ -27,10 +27,7 @@ MOI.Utilities.@struct_of_constraints_by_function_types(
     RealAff,
 )
 
-MOI.Utilities.@product_of_sets(
-    ComplexCones,
-    ScaledPSDCone,
-)
+MOI.Utilities.@product_of_sets(ComplexCones, ScaledPSDCone,)
 
 MOI.Utilities.@product_of_sets(
     Cones,
@@ -70,9 +67,9 @@ const OptimizerCache = MOI.Utilities.GenericModel{
 }
 
 mutable struct Solution
-    x::Vector{Float64}
+    x::Vector{ComplexF64}
     y::Vector{Float64}
-    slack::Vector{Float64}
+    slack::Vector{ComplexF64}
     objective_value::Float64
     dual_objective_value::Float64
     objective_constant::Float64
@@ -172,7 +169,7 @@ function MOI.supports_constraint(
 end
 
 function _map_sets(f, sets, ::Type{S}) where {S}
-    F = MOI.VectorAffineFunction{Float64}
+    F = MOI.VectorAffineFunction{eltype(sets.coefficients.nzval)}
     cis = MOI.get(sets, MOI.ListOfConstraintIndices{F,S}())
     return Int[f(MOI.get(sets, MOI.ConstraintSet(), ci)) for ci in cis]
 end
@@ -180,22 +177,23 @@ end
 function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     index_map = MOI.Utilities.identity_index_map(src)
-    Ac_complex = MOI.Utilities.constraints(
-        src.constraints,
-        MOI.VectorAffineFunction{ComplexF64},
-        ScaledPSDCone,
-    )
     Ac_real = MOI.Utilities.constraints(
         src.constraints,
         MOI.VectorAffineFunction{Float64},
         ScaledPSDCone,
     )
     A_real = Ac_real.coefficients
+    Ac_complex = MOI.Utilities.constraints(
+        src.constraints,
+        MOI.VectorAffineFunction{ComplexF64},
+        ScaledPSDCone,
+    )
+    A_complex = Ac_complex.coefficients
 
     model_attributes = MOI.get(src, MOI.ListOfModelAttributesSet())
     objective_function_attr =
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    b = zeros(A_real.n)
+    b = zeros(A_real.n) #must be equal to A_complex.n
     max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     objective_constant = 0.0
     if objective_function_attr in MOI.get(src, MOI.ListOfModelAttributesSet())
@@ -206,8 +204,22 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         end
     end
 
-    # TODO add complex
-    A = SparseMatrixCSC(A_real.m, A_real.n, A_real.colptr, A_real.rowval, -A_real.nzval)
+    AR = SparseMatrixCSC(
+        A_real.m,
+        A_real.n,
+        A_real.colptr,
+        A_real.rowval,
+        -A_real.nzval,
+    )
+    AC = SparseMatrixCSC(
+        A_complex.m,
+        A_complex.n,
+        A_complex.colptr,
+        A_complex.rowval,
+        -A_complex.nzval,
+    )
+    A = A_complex.m == 0 ? AR : [AR; AC] #keep it real if we can
+
     # If m == n, SeDuMi thinks we give A'.
     # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
     if A.m != A.n
@@ -220,21 +232,27 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         options[:fid] = 0
     end
 
+    realPSDdims = _map_sets(MOI.side_dimension, Ac_real, ScaledPSDCone)
+    complexPSDdims = _map_sets(MOI.side_dimension, Ac_complex, ScaledPSDCone)
     K = Cone(
         Ac_real.sets.num_rows[1],
         Ac_real.sets.num_rows[2] - Ac_real.sets.num_rows[1],
         _map_sets(MOI.dimension, Ac_real, MOI.SecondOrderCone),
         _map_sets(MOI.dimension, Ac_real, MOI.RotatedSecondOrderCone),
-        _map_sets(MOI.side_dimension, Ac_real, ScaledPSDCone),
+        [realPSDdims; complexPSDdims],
+        Vector(
+            length(realPSDdims)+1:length(realPSDdims)+length(complexPSDdims),
+        ),
     )
 
     c_real = Ac_real.constants
-    c = c_real # TODO add complex
+    c_complex = Ac_complex.constants
+    c = isempty(c_complex) ? c_real : [c_real; c_complex]
     x, y, info = sedumi(A, b, c, K; options...)
 
     dest.cones = deepcopy(Ac_real.sets)
     objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
-    dual_objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(c, x)
+    dual_objective_value = (max_sense ? 1 : -1) * real(LinearAlgebra.dot(c, x))
     dest.sol = Solution(
         x,
         y,
