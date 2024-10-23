@@ -77,7 +77,7 @@ mutable struct Solution
 end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    cones::Union{Nothing,Cones{Float64}}
+    cones::Union{Nothing,Cones{Float64},ComplexCones{ComplexF64}}
     sol::Union{Nothing,Solution}
     silent::Bool
     options::Dict{Symbol,Any}
@@ -251,6 +251,7 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     x, y, info = sedumi(A, b, c, K; options...)
 
     dest.cones = deepcopy(Ac_real.sets)
+#    dest.cones = deepcopy(Ac_complex.sets)
     objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
     dual_objective_value = (max_sense ? 1 : -1) * real(LinearAlgebra.dot(c, x))
     dest.sol = Solution(

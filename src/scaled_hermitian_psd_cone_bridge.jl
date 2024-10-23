@@ -63,9 +63,7 @@ function MOI.Bridges.inverse_map_function(
     ::Type{<:ScaledHermitianPSDConeBridge},
     square,
 )
-    triangle = square_to_triangle(square)
-    unscale_coefficients!(triangle)
-    return triangle
+    return _sedumi_to_moi(square)
 end
 
 # Used to map the ConstraintDual from SeDuMi -> MOI
@@ -73,14 +71,21 @@ function MOI.Bridges.adjoint_map_function(
     ::Type{<:ScaledHermitianPSDConeBridge},
     square,
 )
-    triangle = square_to_triangle(square)
+    return _sedumi_to_moi(square)
+end
+
+function _sedumi_to_moi(square)
     n = isqrt(length(square))
-    for i in 1:n, j in 1:(i-1)
-        # Add lower diagonal dual. It should be equal to upper diagonal dual
-        # but `unscale_coefficients` will divide by 2 so it will do the mean
-        triangle[MOI.Utilities.trimap(i, j)] += square[square_map(i, j, n)]
+    triangle_size = div(n * (n + 1), 2)
+    triangle = Vector{real(eltype(square))}(undef, n^2)
+    for j in 1:n, i in 1:j
+        triangle[MOI.Utilities.trimap(i, j)] = real(square[square_map(i, j, n)])
     end
-    unscale_coefficients!(triangle)
+    counter = 0
+    for j in 2:n, i in 1:j-1
+        counter += 1
+        triangle[triangle_size + counter] = imag(square[square_map(i, j, n)])
+    end
     return triangle
 end
 
