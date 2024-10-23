@@ -84,7 +84,7 @@ function _sedumi_to_moi(square)
     counter = 0
     for j in 2:n, i in 1:j-1
         counter += 1
-        triangle[triangle_size + counter] = imag(square[square_map(i, j, n)])
+        triangle[triangle_size+counter] = imag(square[square_map(i, j, n)])
     end
     return triangle
 end
