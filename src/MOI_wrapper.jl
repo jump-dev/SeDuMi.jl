@@ -91,7 +91,7 @@ function MOI.default_cache(::Optimizer, ::Type{Float64})
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
-    return [ScaledPSDConeBridge{Float64}, ScaledHermitianPSDConeBridge{Float64}]
+    return Type[ScaledPSDConeBridge{Float64}, ScaledHermitianPSDConeBridge{Float64}]
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
