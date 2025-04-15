@@ -52,13 +52,15 @@ function test_runtests()
                 MOI.SolverVersion,
             ],
         ),
-        exclude = String[
+        exclude = [
             # Expected test failures:
             #   ArgumentError: The number of constraints must be greater than 0
             "test_attribute_RawStatusString",
             "test_attribute_SolveTimeSec",
             "test_objective_ObjectiveFunction_blank",
             "test_solve_TerminationStatus_DUAL_INFEASIBLE",
+            # Out of memory.
+            "test_conic_empty_matrix",
             # TODO investigate
             #  Expression: ≈(MOI.get(model, MOI.ConstraintPrimal(), c2), 0, atol = atol, rtol = rtol)
             #  Evaluated: 1.7999998823840366 ≈ 0 (atol=0.0001, rtol=0.0001)
@@ -74,12 +76,12 @@ function test_runtests()
             "test_conic_SecondOrderCone_no_initial_bound",
             # FIXME The objective has wrong sign
             # See https://github.com/jump-dev/MathOptInterface.jl/issues/1759
-            "test_unbounded_MAX_SENSE",
-            "test_unbounded_MAX_SENSE_offset",
+            r"^test_unbounded_MAX_SENSE$",
+            r"^test_unbounded_MAX_SENSE_offset$",
             # FIXME The objective is wrong
             # See https://github.com/jump-dev/MathOptInterface.jl/issues/1759
-            "test_unbounded_MIN_SENSE",
-            "test_unbounded_MIN_SENSE_offset",
+            r"^test_unbounded_MIN_SENSE$",
+            r"^test_unbounded_MIN_SENSE_offset$",
         ],
     )
     return
