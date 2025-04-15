@@ -2,7 +2,7 @@ struct ScaledHermitianPSDConeBridge{T,G} <: MOI.Bridges.Constraint.SetMapBridge{
     T,
     ScaledPSDCone,
     MOI.HermitianPositiveSemidefiniteConeTriangle,
-    MOI.VectorAffineFunction{T},
+    MOI.VectorAffineFunction{ComplexF64},
     G,
 }
     constraint::MOI.ConstraintIndex{
