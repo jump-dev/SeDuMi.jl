@@ -127,7 +127,7 @@ function triangle_to_square(x, n = triangle_side_dimension(length(x)))
 end
 
 function triangle_to_square_indices!(x::Vector{<:MOI.VectorAffineTerm}, n)
-    map = square_to_triangle(1:n^2, n)
+    map = square_to_triangle(1:(n^2), n)
     for i in eachindex(x)
         x[i] = MOI.VectorAffineTerm(map[x[i].output_index], x[i].scalar_term)
     end
