@@ -51,8 +51,11 @@ jobs:
           const libeng = Ref{Ptr{Cvoid}}()
           const eng_open = Ref{Ptr{Cvoid}}()
           libeng_path = joinpath(ENV["MATLAB_ROOT"], "bin", "glnxa64", "libeng")
+          @show libeng_path
           libeng[] = Libdl.dlopen(libeng_path, Libdl.RTLD_GLOBAL)
+          @show libeng[]
           eng_open[] = Libdl.dlsym(libeng[], :engOpen)
+          @show eng_open[]
           ep = ccall(
             eng_open[], 
             Ptr{Cvoid}, 
