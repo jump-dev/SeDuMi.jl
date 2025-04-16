@@ -14,7 +14,7 @@ using SeDuMi
         1.0 0.5 0.0 1.0
     ]
     b = [5.0, 3.0]
-    sol, dual, status = sedumi(A, b, c, fid = 0)
+    sol, dual, status = sedumi(A, b, c)
     @test sol ≈ sparse([1, 2], [1, 1], [47 / 24, 25 // 12], 4, 1)
     @test dual ≈ [1 / 8, -1 / 4]
     @test iszero(status["pinf"])
