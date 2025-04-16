@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: matlab-actions/setup-matlab@v2
         with:
-          release: R2021b
+          release: R2024a
       - shell: bash
         run: |
           sudo apt-get install csh
