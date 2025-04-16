@@ -27,24 +27,34 @@ jobs:
       - uses: matlab-actions/setup-matlab@v2
         with:
           release: R2024a
-      - shell: bash
-        run: |
-          sudo apt-get install csh
-          wget https://github.com/sqlp/sedumi/releases/download/v1.3.8/sedumi.tgz
-          tar -xf sedumi.tgz
-          ls -l
-      - uses: matlab-actions/run-command@v2
-        with:
-          command: cd("sedumi"), install_sedumi -rebuild
+      # - shell: bash
+      #   run: |
+      #     sudo apt-get install csh
+      #     wget https://github.com/sqlp/sedumi/releases/download/v1.3.8/sedumi.tgz
+      #     tar -xf sedumi.tgz
+      #     ls -l
+      # - uses: matlab-actions/run-command@v2
+      #   with:
+      #     command: cd("sedumi"), install_sedumi
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v4
-        with:
-          file: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
+      # - uses: julia-actions/cache@v2
+      - name: Set MATLAB environment variables
+        run: |
+          echo "MATLAB_ROOT=$MATLAB_ROOT" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$MATLAB_ROOT/bin/glnxa64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      - shell: julia --color=yes {0}
+        run: |
+          import Pkg
+          Pkg.add("MATLAB")
+          using MATLAB
+          mat"disp(\"Hello from MATLAB via Julia\")"
+      # - uses: julia-actions/julia-buildpkg@v1
+      # - uses: julia-actions/julia-runtest@v1
+      # - uses: julia-actions/julia-processcoverage@v1
+      # - uses: codecov/codecov-action@v4
+      #   with:
+      #     file: lcov.info
+      #     token: ${{ secrets.CODECOV_TOKEN }}
