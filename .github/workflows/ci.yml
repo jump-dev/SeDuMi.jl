@@ -35,7 +35,7 @@ jobs:
           ls -l
       - uses: matlab-actions/run-command@v2
         with:
-          command: cd("sedumi"), install_sedumi
+          command: cd("sedumi"), install_sedumi -rebuild
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
