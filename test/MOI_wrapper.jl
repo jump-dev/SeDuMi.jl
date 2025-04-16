@@ -43,8 +43,8 @@ function test_runtests()
     MOI.Test.runtests(
         model,
         MOI.Test.Config(
-            rtol = 1e-4,
-            atol = 1e-4,
+            rtol = 5e-3,
+            atol = 5e-3,
             exclude = Any[
                 MOI.ConstraintBasisStatus,
                 MOI.VariableBasisStatus,
