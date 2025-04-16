@@ -4,6 +4,11 @@ on:
     branches: [master]
   pull_request:
     types: [opened, synchronize, reopened]
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 # needed to allow julia-actions/cache to delete old caches that it has created
 permissions:
   actions: write
@@ -24,6 +29,7 @@ jobs:
           release: R2021b
       - shell: bash
         run: |
+          sudo apt-get install csh
           wget https://github.com/sqlp/sedumi/releases/download/v1.3.8/sedumi.tgz
           tar -xf sedumi.tgz
           ls -l
