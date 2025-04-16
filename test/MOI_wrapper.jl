@@ -44,7 +44,7 @@ function test_runtests()
         model.optimizer,
         MathOptInterface.Bridges.Variable.ZerosBridge{Float64},
     )
-    MOI.set(model, MOI.Silent(), true)
+    # MOI.set(model, MOI.Silent(), true)
     MOI.Test.runtests(
         model,
         MOI.Test.Config(

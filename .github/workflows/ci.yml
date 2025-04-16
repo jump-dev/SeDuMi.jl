@@ -1,0 +1,44 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+# needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+  actions: write
+  contents: read
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.10']
+        os: [ubuntu-latest]
+        arch: [x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2024a
+      - shell: bash
+        run: |
+          wget https://github.com/sqlp/sedumi/releases/download/v1.3.8/sedumi.tgz
+          tar -xf sedumi.tgz
+          ls -l
+      - uses: matlab-actions/run-command@v2
+        with:
+          command: cd("sedumi"), install_sedumi
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v4
+        with:
+          file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
