@@ -41,10 +41,10 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       # - uses: julia-actions/cache@v2
-      - name: Set MATLAB environment variables
-        run: |
-          echo "MATLAB_ROOT=$MATLAB_ROOT" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$MATLAB_ROOT/bin/glnxa64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      # - name: Set MATLAB environment variables
+      #   run: |
+      #     echo "MATLAB_ROOT=$MATLAB_ROOT" >> $GITHUB_ENV
+      #     echo "LD_LIBRARY_PATH=$MATLAB_ROOT/bin/glnxa64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - shell: julia --color=yes {0}
         run: |
           import Pkg
