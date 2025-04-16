@@ -56,6 +56,8 @@ jobs:
           @show libeng[]
           eng_open[] = Libdl.dlsym(libeng[], :engOpen)
           @show eng_open[]
+          libeng = libeng_path
+          @ccall libeng.engOpen("-nodisplay -nosplash -nodesktop"::Ptr{UInt8})::Ptr{Cvoid}
           ep = ccall(
             eng_open[], 
             Ptr{Cvoid}, 
