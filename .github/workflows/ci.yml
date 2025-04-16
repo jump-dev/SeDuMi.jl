@@ -41,16 +41,24 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       # - uses: julia-actions/cache@v2
-      # - name: Set MATLAB environment variables
-      #   run: |
-      #     echo "MATLAB_ROOT=$MATLAB_ROOT" >> $GITHUB_ENV
-      #     echo "LD_LIBRARY_PATH=$MATLAB_ROOT/bin/glnxa64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      - name: Set MATLAB environment variables
+        run: |
+          echo "MATLAB_ROOT=/opt/hostedtoolcache/MATLAB/2024.1.999/x64" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$MATLAB_ROOT/bin/glnxa64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - shell: julia --color=yes {0}
         run: |
-          import Pkg
-          Pkg.add("MATLAB")
-          using MATLAB
-          mat"disp(\"Hello from MATLAB via Julia\")"
+          const libeng = Ref{Ptr{Cvoid}}()
+          const eng_open = Ref{Ptr{Cvoid}}()
+          libeng_path = joinpath(ENV["MATLAB_ROOT"], "bin", "glnxa64", "libeng")
+          libeng[] = Libdl.dlopen(libeng_path, Libdl.RTLD_GLOBAL)
+          eng_open[] = Libdl.dlsym(libeng[], :engOpen)
+          ep = ccall(
+            eng_open[], 
+            Ptr{Cvoid}, 
+            (Ptr{UInt8},),
+            "-nodisplay -nosplash -nodesktop",
+          )
+          @show ep
       # - uses: julia-actions/julia-buildpkg@v1
       # - uses: julia-actions/julia-runtest@v1
       # - uses: julia-actions/julia-processcoverage@v1
