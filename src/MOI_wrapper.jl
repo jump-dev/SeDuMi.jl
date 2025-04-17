@@ -2,7 +2,6 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 include("scaled_psd_cone_bridge.jl")
-include("scaled_hermitian_psd_cone_bridge.jl")
 
 import LinearAlgebra
 
@@ -93,7 +92,8 @@ end
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
     return Type[
         ScaledPSDConeBridge{Float64},
-        ScaledHermitianPSDConeBridge{Float64},
+        ScaledPSDConeBridge{ComplexF64},
+        MOI.Bridges.Constraint.HermitianToComplexSymmetricBridge{Float64},
     ]
 end
 
