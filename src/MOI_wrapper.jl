@@ -244,7 +244,7 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         _map_sets(MOI.dimension, Ac_real, MOI.RotatedSecondOrderCone),
         [realPSDdims; complexPSDdims],
         Vector(
-            length(realPSDdims)+1:length(realPSDdims)+length(complexPSDdims),
+               (length(realPSDdims)+1):(length(realPSDdims)+length(complexPSDdims)),
         ),
     )
 
