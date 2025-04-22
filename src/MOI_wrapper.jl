@@ -93,7 +93,6 @@ function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
     return Type[
         ScaledPSDConeBridge{Float64},
         ScaledPSDConeBridge{ComplexF64},
-        MOI.Bridges.Constraint.HermitianToComplexSymmetricBridge{Float64},
     ]
 end
 
