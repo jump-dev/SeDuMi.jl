@@ -27,6 +27,20 @@ function test_options()
     @test MOI.get(optimizer, MOI.RawOptimizerAttribute("fid")) == 0
 end
 
+function test_complex()
+    model = MOI.instantiate(SeDuMi.Optimizer; with_bridge_type = Float64)
+    ComplexF = MOI.VectorAffineFunction{ComplexF64}
+    S = SeDuMi.ScaledPSDCone
+    @test MOI.supports_constraint(model, ComplexF, S)
+    S = MOI.PositiveSemidefiniteConeTriangle
+    @test MOI.supports_constraint(model, ComplexF, S)
+    S = MOI.HermitianPositiveSemidefiniteConeTriangle
+    F = MOI.VectorAffineFunction{Float64}
+    @test MOI.supports_constraint(model, F, S)
+    @test MOI.Bridges.bridge_type(model, F, S) == MOI.Bridges.Constraint.HermitianToComplexSymmetricBridge{Float64, ComplexF, F}
+    return
+end
+
 function test_runtests()
     model = MOI.Utilities.CachingOptimizer(
         MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
