@@ -37,7 +37,12 @@ function test_complex()
     S = MOI.HermitianPositiveSemidefiniteConeTriangle
     F = MOI.VectorAffineFunction{Float64}
     @test MOI.supports_constraint(model, F, S)
-    @test MOI.Bridges.bridge_type(model, F, S) == MOI.Bridges.Constraint.HermitianToComplexSymmetricBridge{Float64, ComplexF, F}
+    @test MOI.Bridges.bridge_type(model, F, S) ==
+          MOI.Bridges.Constraint.HermitianToComplexSymmetricBridge{
+        Float64,
+        ComplexF,
+        F,
+    }
     return
 end
 
