@@ -97,7 +97,8 @@ end
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
 
 function MOI.is_empty(optimizer::Optimizer)
-    return optimizer.cones_real === nothing && optimizer.cones_complex === nothing
+    return optimizer.cones_real === nothing &&
+           optimizer.cones_complex === nothing
 end
 function MOI.empty!(optimizer::Optimizer)
     optimizer.cones_real = nothing
