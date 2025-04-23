@@ -434,7 +434,10 @@ function MOI.get(
     ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_real, ci)]
+    return convert(
+        Vector{Float64},
+        optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_real, ci)],
+    )
 end
 function MOI.get(
     optimizer::Optimizer,
