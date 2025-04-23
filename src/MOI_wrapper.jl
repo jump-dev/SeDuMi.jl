@@ -76,12 +76,13 @@ mutable struct Solution
 end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    cones::Union{Nothing,Cones{Float64},ComplexCones{ComplexF64}}
+    cones_real::Union{Nothing,Cones{Float64}}
+    cones_complex::Union{Nothing,ComplexCones{ComplexF64}}
     sol::Union{Nothing,Solution}
     silent::Bool
     options::Dict{Symbol,Any}
     function Optimizer()
-        return new(nothing, nothing, false, Dict{Symbol,Any}())
+        return new(nothing, nothing, nothing, false, Dict{Symbol,Any}())
     end
 end
 
@@ -96,10 +97,11 @@ end
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
 
 function MOI.is_empty(optimizer::Optimizer)
-    return optimizer.cones === nothing
+    return optimizer.cones_real === nothing && optimizer.cones_complex === nothing
 end
 function MOI.empty!(optimizer::Optimizer)
-    optimizer.cones = nothing
+    optimizer.cones_real = nothing
+    optimizer.cones_complex = nothing
     optimizer.sol = nothing
     return
 end
@@ -251,8 +253,8 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     c = isempty(c_complex) ? c_real : [c_real; c_complex]
     x, y, info = sedumi(A, b, c, K; options...)
 
-    dest.cones = deepcopy(Ac_real.sets)
-    #dest.cones = deepcopy(Ac_complex.sets)
+    dest.cones_real = deepcopy(Ac_real.sets)
+    dest.cones_complex = deepcopy(Ac_complex.sets)
     objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
     dual_objective_value = (max_sense ? 1 : -1) * real(LinearAlgebra.dot(c, x))
     dest.sol = Solution(
@@ -412,14 +414,21 @@ function MOI.get(
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones, ci)]
 end
-
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones, ci)]
+    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_real, ci)]
+end
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
+)
+    MOI.check_result_index_bounds(optimizer, attr)
+    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_complex, ci)]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
