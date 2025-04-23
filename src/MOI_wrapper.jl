@@ -412,10 +412,21 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones, ci)]
+    return optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones_real, ci)]
+end
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
+)
+    MOI.check_result_index_bounds(optimizer, attr)
+    return optimizer.sol.slack[optimizer.complex_offset .+ MOI.Utilities.rows(
+        optimizer.cones_complex,
+        ci,
+    )]
 end
 function MOI.get(
     optimizer::Optimizer,
