@@ -78,11 +78,12 @@ end
 mutable struct Optimizer <: MOI.AbstractOptimizer
     cones_real::Union{Nothing,Cones{Float64}}
     cones_complex::Union{Nothing,ComplexCones{ComplexF64}}
+    complex_offset::Int
     sol::Union{Nothing,Solution}
     silent::Bool
     options::Dict{Symbol,Any}
     function Optimizer()
-        return new(nothing, nothing, nothing, false, Dict{Symbol,Any}())
+        return new(nothing, nothing, 0, nothing, false, Dict{Symbol,Any}())
     end
 end
 
@@ -256,6 +257,7 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
 
     dest.cones_real = deepcopy(Ac_real.sets)
     dest.cones_complex = deepcopy(Ac_complex.sets)
+    dest.complex_offset = length(c_real)
     objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
     dual_objective_value = (max_sense ? 1 : -1) * real(LinearAlgebra.dot(c, x))
     dest.sol = Solution(
@@ -429,7 +431,10 @@ function MOI.get(
     ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_complex, ci)]
+    return optimizer.sol.x[optimizer.complex_offset .+ MOI.Utilities.rows(
+        optimizer.cones_complex,
+        ci,
+    )]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
