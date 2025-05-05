@@ -141,9 +141,8 @@ end
 _row(i, t::MOI.VectorAffineTerm) = t.output_index
 _row(i, β) = i
 
-_prod(α, t::MOI.VectorAffineTerm{Float64}) = MOI.Utilities.operate_term(*, α, t)
-function _prod(α, t::MOI.VectorAffineTerm{ComplexF64})
-    return MOI.Utilities.operate_term(*, ComplexF64(α), t)
+function _prod(α, t::MOI.VectorAffineTerm{T}) where {T}
+    return MOI.Utilities.operate_term(*, convert(T, α), t)
 end
 _prod(α, β) = α * β
 

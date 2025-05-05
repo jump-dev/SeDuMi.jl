@@ -248,11 +248,7 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         _map_sets(MOI.dimension, Ac_real, MOI.SecondOrderCone),
         _map_sets(MOI.dimension, Ac_real, MOI.RotatedSecondOrderCone),
         [realPSDdims; complexPSDdims],
-        Vector(
-            (length(
-                realPSDdims,
-            )+1):(length(realPSDdims)+length(complexPSDdims)),
-        convert(Vector{Int}, length(realPSDdims).+(1:length(complexPSDdims)))
+        convert(Vector{Int}, length(realPSDdims) .+ (1:length(complexPSDdims))),
     )
 
     c_real = Ac_real.constants
@@ -364,6 +360,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.ObjectiveValue)
     end
     return value
 end
+
 function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
     MOI.check_result_index_bounds(optimizer, attr)
     value = optimizer.sol.dual_objective_value
@@ -406,6 +403,7 @@ function MOI.get(
         return MOI.NEARLY_FEASIBLE_POINT
     end
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.VariablePrimal,
@@ -414,6 +412,7 @@ function MOI.get(
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.y[vi.value]
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
@@ -425,17 +424,17 @@ function MOI.get(
         optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones_real, ci)],
     )
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.slack[optimizer.complex_offset .+ MOI.Utilities.rows(
-        optimizer.cones_complex,
-        ci,
-    )]
+    rows = MOI.Utilities.rows(optimizer.cones_complex, ci)
+    return optimizer.sol.slack[optimizer.complex_offset .+ rows]
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
@@ -447,16 +446,15 @@ function MOI.get(
         optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_real, ci)],
     )
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.x[optimizer.complex_offset .+ MOI.Utilities.rows(
-        optimizer.cones_complex,
-        ci,
-    )]
+    rows = MOI.Utilities.rows(optimizer.cones_complex, ci)
+    return optimizer.sol.x[optimizer.complex_offset .+ rows]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
