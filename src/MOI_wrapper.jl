@@ -252,7 +252,7 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
             (length(
                 realPSDdims,
             )+1):(length(realPSDdims)+length(complexPSDdims)),
-        ),
+        convert(Vector{Int}, length(realPSDdims).+(1:length(complexPSDdims)))
     )
 
     c_real = Ac_real.constants
