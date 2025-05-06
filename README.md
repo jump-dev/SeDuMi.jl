@@ -31,6 +31,31 @@ model = Model(SeDuMi.Optimizer)
 set_attribute(model, "fid", 0)
 ```
 
+## MathOptInterface API
+
+The SeDuMi optimizer supports the following constraints and attributes.
+
+List of supported objective functions:
+
+ * [`MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}`](@ref)
+
+List of supported variable types:
+
+ * [`MOI.Reals`](@ref)
+
+List of supported constraint types:
+
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.Nonnegatives`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.RotatedSecondOrderCone`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.SecondOrderCone`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.Zeros`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in `SeDuMi.ScaledPSDCone`
+ * [`MOI.VectorAffineFunction{ComplexF64}`](@ref) in `SeDuMi.ScaledPSDCone`
+
+List of supported model attributes:
+
+ * [`MOI.ObjectiveSense()`](@ref)
+
 ## Installation
 
 First, make sure that you satisfy the requirements of the
