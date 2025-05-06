@@ -26,8 +26,7 @@ using SeDuMi
         ]
         b = [1.0, 0.0]
         c = [0.0, 1.0, 0.0, 0.0, 1.0]
-        primal, dual, info =
-            sedumi(A, b, c, SeDuMi.Cone(0, 1, [], [], [2]), fid = 0)
+        primal, dual, info = sedumi(A, b, c, SeDuMi.Cone(0, 1, [], [], [2]))
         @test primal ≈ [1, 1, -1, -1, 1]
         @test dual ≈ [2.0, 0.0]
         @test info["pinf"] == 0.0
@@ -43,8 +42,7 @@ using SeDuMi
         ]
         b = [1.0, 0.0]
         c = [1.0, 0.0, 0.0, 1.0]
-        primal, dual, info =
-            sedumi(A, b, c, SeDuMi.Cone(0, 0, [], [], [2]), fid = 0)
+        primal, dual, info = sedumi(A, b, c, SeDuMi.Cone(0, 0, [], [], [2]))
         @test isempty(primal)
         @test dual == [1.0, -1.0]
         @test info["pinf"] == 1.0
