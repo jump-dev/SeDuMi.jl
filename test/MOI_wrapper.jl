@@ -6,10 +6,8 @@
 module TestSeDuMi
 
 using Test
-using MathOptInterface
+import MathOptInterface as MOI
 import SeDuMi
-
-const MOI = MathOptInterface
 
 function runtests()
     for name in names(@__MODULE__; all = true)
@@ -32,6 +30,51 @@ function test_options()
     @test MOI.get(optimizer, MOI.RawOptimizerAttribute("fid")) == 0
 end
 
+function test_complex_bridges()
+    model = MOI.instantiate(SeDuMi.Optimizer; with_bridge_type = Float64)
+    ComplexF = MOI.VectorAffineFunction{ComplexF64}
+    S = SeDuMi.ScaledPSDCone
+    @test MOI.supports_constraint(model, ComplexF, S)
+    S = MOI.PositiveSemidefiniteConeTriangle
+    @test MOI.supports_constraint(model, ComplexF, S)
+    S = MOI.HermitianPositiveSemidefiniteConeTriangle
+    F = MOI.VectorAffineFunction{Float64}
+    @test MOI.supports_constraint(model, F, S)
+    @test MOI.Bridges.bridge_type(model, F, S) ==
+          MOI.Bridges.Constraint.HermitianToComplexSymmetricBridge{
+        Float64,
+        ComplexF,
+        F,
+    }
+    return
+end
+
+function test_complex()
+    model = MOI.instantiate(SeDuMi.Optimizer; with_cache_type = Float64)
+    x = MOI.add_variable(model)
+    T = ComplexF64
+    c = MOI.add_constraint(
+        model,
+        MOI.Utilities.vectorize([
+            one(T) + zero(T) * x,
+            -1.0im * x,
+            1.0im * x,
+            one(T) + zero(T) * x,
+        ]),
+        SeDuMi.ScaledPSDCone(2),
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    obj = 1.0 * x
+    MOI.set(model, MOI.ObjectiveFunction{typeof(obj)}(), obj)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+    @test MOI.get(model, MOI.VariablePrimal(), x) ≈ 1 rtol = 1e-5
+    @test MOI.get(model, MOI.ConstraintPrimal(), c) ≈ [1, -im, im, 1] rtol =
+        1e-5
+    @test MOI.get(model, MOI.ConstraintDual(), c) ≈ [0.5, 0.5im, -0.5im, 0.5] rtol =
+        1e-5
+end
+
 function test_runtests()
     model = MOI.Utilities.CachingOptimizer(
         MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
@@ -42,7 +85,7 @@ function test_runtests()
     # `Variable.ZerosBridge` makes dual needed by some tests fail.
     MOI.Bridges.remove_bridge(
         model.optimizer,
-        MathOptInterface.Bridges.Variable.ZerosBridge{Float64},
+        MOI.Bridges.Variable.ZerosBridge{Float64},
     )
     MOI.set(model, MOI.Silent(), true)
     MOI.Test.runtests(

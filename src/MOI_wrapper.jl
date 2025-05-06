@@ -12,7 +12,7 @@ import LinearAlgebra
 
 # SeDuMi solves the primal/dual pair
 # min c'x,       max b'y
-# s.t. Ax = b,   c - A'x ∈ K
+# s.t. Ax = b,   c - A'y ∈ K
 #       x ∈ K
 # where K is a product of `MOI.Zeros`, `MOI.Nonnegatives`,
 # `MOI.SecondOrderCone`, `MOI.RotatedSecondOrderCone` and
@@ -21,6 +21,20 @@ import LinearAlgebra
 # This wrapper copies the MOI problem to the SeDuMi dual so the natively
 # supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
 # of the sets just listed above.
+
+# If these `const` are remove and coopy-pasted in the `struct` below, then we
+# get hit by this assertion error:
+# https://github.com/jump-dev/MathOptInterface.jl/blob/86bfa1d37d41f95ae8e2b9e6a7436e17ebe14d81/src/Utilities/struct_of_constraints.jl#L254
+const ComplexAff = MOI.VectorAffineFunction{Complex{Float64}}
+const RealAff = MOI.VectorAffineFunction{Float64}
+
+MOI.Utilities.@struct_of_constraints_by_function_types(
+    ComplexOrReal,
+    ComplexAff,
+    RealAff,
+)
+
+MOI.Utilities.@product_of_sets(ComplexCones, ScaledPSDCone,)
 
 MOI.Utilities.@product_of_sets(
     Cones,
@@ -35,22 +49,34 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     Float64,
     MOI.Utilities.ObjectiveContainer{Float64},
     MOI.Utilities.VariablesContainer{Float64},
-    MOI.Utilities.MatrixOfConstraints{
-        Float64,
-        MOI.Utilities.MutableSparseMatrixCSC{
-            Float64,
-            Int,
-            MOI.Utilities.OneBasedIndexing,
+    ComplexOrReal{Float64}{
+        MOI.Utilities.MatrixOfConstraints{
+            ComplexF64,
+            MOI.Utilities.MutableSparseMatrixCSC{
+                ComplexF64,
+                Int,
+                MOI.Utilities.OneBasedIndexing,
+            },
+            Vector{ComplexF64},
+            ComplexCones{ComplexF64},
         },
-        Vector{Float64},
-        Cones{Float64},
+        MOI.Utilities.MatrixOfConstraints{
+            Float64,
+            MOI.Utilities.MutableSparseMatrixCSC{
+                Float64,
+                Int,
+                MOI.Utilities.OneBasedIndexing,
+            },
+            Vector{Float64},
+            Cones{Float64},
+        },
     },
 }
 
 mutable struct Solution
-    x::Vector{Float64}
+    x::Vector{ComplexF64}
     y::Vector{Float64}
-    slack::Vector{Float64}
+    slack::Vector{ComplexF64}
     objective_value::Float64
     dual_objective_value::Float64
     objective_constant::Float64
@@ -58,12 +84,14 @@ mutable struct Solution
 end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    cones::Union{Nothing,Cones{Float64}}
+    cones_real::Union{Nothing,Cones{Float64}}
+    cones_complex::Union{Nothing,ComplexCones{ComplexF64}}
+    complex_offset::Int
     sol::Union{Nothing,Solution}
     silent::Bool
     options::Dict{Symbol,Any}
     function Optimizer()
-        return new(nothing, nothing, false, Dict{Symbol,Any}())
+        return new(nothing, nothing, 0, nothing, false, Dict{Symbol,Any}())
     end
 end
 
@@ -72,16 +100,18 @@ function MOI.default_cache(::Optimizer, ::Type{Float64})
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
-    return Type[ScaledPSDConeBridge{Float64}]
+    return Type[ScaledPSDConeBridge{Float64}, ScaledPSDConeBridge{ComplexF64}]
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "SeDuMi"
 
 function MOI.is_empty(optimizer::Optimizer)
-    return optimizer.cones === nothing
+    return optimizer.cones_real === nothing &&
+           optimizer.cones_complex === nothing
 end
 function MOI.empty!(optimizer::Optimizer)
-    optimizer.cones = nothing
+    optimizer.cones_real = nothing
+    optimizer.cones_complex = nothing
     optimizer.sol = nothing
     return
 end
@@ -141,8 +171,16 @@ function MOI.supports_constraint(
     return true
 end
 
+function MOI.supports_constraint(
+    ::Optimizer,
+    ::Type{MOI.VectorAffineFunction{ComplexF64}},
+    ::Type{ScaledPSDCone},
+)
+    return true
+end
+
 function _map_sets(f, sets, ::Type{S}) where {S}
-    F = MOI.VectorAffineFunction{Float64}
+    F = MOI.VectorAffineFunction{eltype(sets.coefficients.nzval)}
     cis = MOI.get(sets, MOI.ListOfConstraintIndices{F,S}())
     return Int[f(MOI.get(sets, MOI.ConstraintSet(), ci)) for ci in cis]
 end
@@ -150,13 +188,23 @@ end
 function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     index_map = MOI.Utilities.identity_index_map(src)
-    Ac = src.constraints
-    A = Ac.coefficients
+    Ac_real = MOI.Utilities.constraints(
+        src.constraints,
+        MOI.VectorAffineFunction{Float64},
+        ScaledPSDCone,
+    )
+    A_real = Ac_real.coefficients
+    Ac_complex = MOI.Utilities.constraints(
+        src.constraints,
+        MOI.VectorAffineFunction{ComplexF64},
+        ScaledPSDCone,
+    )
+    A_complex = Ac_complex.coefficients
 
     model_attributes = MOI.get(src, MOI.ListOfModelAttributesSet())
     objective_function_attr =
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    b = zeros(A.n)
+    b = zeros(A_real.n) #must be equal to A_complex.n
     max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     objective_constant = 0.0
     if objective_function_attr in MOI.get(src, MOI.ListOfModelAttributesSet())
@@ -167,9 +215,24 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         end
     end
 
+    AR = SparseMatrixCSC(
+        A_real.m,
+        A_real.n,
+        A_real.colptr,
+        A_real.rowval,
+        -A_real.nzval,
+    )
+    AC = SparseMatrixCSC(
+        A_complex.m,
+        A_complex.n,
+        A_complex.colptr,
+        A_complex.rowval,
+        -A_complex.nzval,
+    )
+    A = A_complex.m == 0 ? AR : [AR; AC] #keep it real if we can
+
     # If m == n, SeDuMi thinks we give A'.
     # See https://github.com/sqlp/sedumi/issues/42#issuecomment-451300096
-    A = SparseMatrixCSC(A.m, A.n, A.colptr, A.rowval, -A.nzval)
     if A.m != A.n
         A = SparseMatrixCSC(A')
     end
@@ -180,20 +243,27 @@ function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
         options[:fid] = 0
     end
 
+    realPSDdims = _map_sets(MOI.side_dimension, Ac_real, ScaledPSDCone)
+    complexPSDdims = _map_sets(MOI.side_dimension, Ac_complex, ScaledPSDCone)
     K = Cone(
-        Ac.sets.num_rows[1],
-        Ac.sets.num_rows[2] - Ac.sets.num_rows[1],
-        _map_sets(MOI.dimension, Ac, MOI.SecondOrderCone),
-        _map_sets(MOI.dimension, Ac, MOI.RotatedSecondOrderCone),
-        _map_sets(MOI.side_dimension, Ac, ScaledPSDCone),
+        Ac_real.sets.num_rows[1],
+        Ac_real.sets.num_rows[2] - Ac_real.sets.num_rows[1],
+        _map_sets(MOI.dimension, Ac_real, MOI.SecondOrderCone),
+        _map_sets(MOI.dimension, Ac_real, MOI.RotatedSecondOrderCone),
+        [realPSDdims; complexPSDdims],
+        convert(Vector{Int}, length(realPSDdims) .+ (1:length(complexPSDdims))),
     )
 
-    c = Ac.constants
+    c_real = Ac_real.constants
+    c_complex = Ac_complex.constants
+    c = isempty(c_complex) ? c_real : [c_real; c_complex]
     x, y, info = sedumi(A, b, c, K; options...)
 
-    dest.cones = deepcopy(Ac.sets)
+    dest.cones_real = deepcopy(Ac_real.sets)
+    dest.cones_complex = deepcopy(Ac_complex.sets)
+    dest.complex_offset = length(c_real)
     objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(b, y)
-    dual_objective_value = (max_sense ? 1 : -1) * LinearAlgebra.dot(c, x)
+    dual_objective_value = (max_sense ? 1 : -1) * real(LinearAlgebra.dot(c, x))
     dest.sol = Solution(
         x,
         y,
@@ -293,6 +363,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.ObjectiveValue)
     end
     return value
 end
+
 function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
     MOI.check_result_index_bounds(optimizer, attr)
     value = optimizer.sol.dual_objective_value
@@ -335,6 +406,7 @@ function MOI.get(
         return MOI.NEARLY_FEASIBLE_POINT
     end
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.VariablePrimal,
@@ -343,22 +415,49 @@ function MOI.get(
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.y[vi.value]
 end
+
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones, ci)]
+    return convert(
+        Vector{Float64},
+        optimizer.sol.slack[MOI.Utilities.rows(optimizer.cones_real, ci)],
+    )
+end
+
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
+)
+    MOI.check_result_index_bounds(optimizer, attr)
+    rows = MOI.Utilities.rows(optimizer.cones_complex, ci)
+    return optimizer.sol.slack[optimizer.complex_offset .+ rows]
 end
 
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return optimizer.sol.x[MOI.Utilities.rows(optimizer.cones, ci)]
+    return convert(
+        Vector{Float64},
+        optimizer.sol.x[MOI.Utilities.rows(optimizer.cones_real, ci)],
+    )
+end
+
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{ComplexF64}},
+)
+    MOI.check_result_index_bounds(optimizer, attr)
+    rows = MOI.Utilities.rows(optimizer.cones_complex, ci)
+    return optimizer.sol.x[optimizer.complex_offset .+ rows]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1

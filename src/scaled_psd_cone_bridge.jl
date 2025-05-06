@@ -141,7 +141,9 @@ end
 _row(i, t::MOI.VectorAffineTerm) = t.output_index
 _row(i, β) = i
 
-_prod(α, t::MOI.VectorAffineTerm) = MOI.Utilities.operate_term(*, α, t)
+function _prod(α, t::MOI.VectorAffineTerm{T}) where {T}
+    return MOI.Utilities.operate_term(*, convert(T, α), t)
+end
 _prod(α, β) = α * β
 
 # Scale coefficients depending on rows index on symmetric packed upper triangular form

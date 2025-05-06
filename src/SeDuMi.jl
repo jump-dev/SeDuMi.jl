@@ -22,10 +22,18 @@ mutable struct Cone
     ycomplex::Vector{Float64} #list of constraints on A*x that should also act on the imaginary part
     xcomplex::Vector{Float64} #list of components of f,l,q,r blocks allowed to be complex
 end
-function Cone(f::Real, l::Real, q::Vector, r::Vector, s::Vector)
-    return Cone(f, l, q, r, s, Float64[], Float64[], Float64[])
+
+function Cone(
+    f::Real,
+    l::Real,
+    q::Vector = Float64[],
+    r::Vector = Float64[],
+    s::Vector = Float64[],
+    scomplex::Vector = Float64[],
+)
+    return Cone(f, l, q, r, s, scomplex, Float64[], Float64[])
 end
-Cone(f::Real, l::Real) = Cone(f, l, Float64[], Float64[], Float64[])
+
 dimension(K::Cone) = K.f + K.l + sum(K.q) + sum(K.r) + sum(K.s .^ 2)
 
 to_vec(x::Vector) = x
@@ -38,7 +46,7 @@ end
 
 # Solve the primal/dual pair
 # min c'x,      max b'y
-# s.t. Ax = b,   c - A'x ∈ K
+# s.t. Ax = b,   c - A'y ∈ K
 #       x ∈ K
 #
 # Note, if `A` is square then SeDuMi assumes that `A'` is passed instead,
