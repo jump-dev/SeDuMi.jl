@@ -57,8 +57,8 @@ function test_complex()
         model,
         MOI.Utilities.vectorize([
             one(T) + zero(T) * x,
-            -1.0im *  x,
-            1.0im *  x,
+            -1.0im * x,
+            1.0im * x,
             one(T) + zero(T) * x,
         ]),
         SeDuMi.ScaledPSDCone(2),
@@ -69,8 +69,10 @@ function test_complex()
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
     @test MOI.get(model, MOI.VariablePrimal(), x) ≈ 1 rtol = 1e-5
-    @test MOI.get(model, MOI.ConstraintPrimal(), c) ≈ [1, -im, im, 1] rtol = 1e-5
-    @test MOI.get(model, MOI.ConstraintDual(), c) ≈ [0.5, 0.5im, -0.5im, 0.5] rtol = 1e-5
+    @test MOI.get(model, MOI.ConstraintPrimal(), c) ≈ [1, -im, im, 1] rtol =
+        1e-5
+    @test MOI.get(model, MOI.ConstraintDual(), c) ≈ [0.5, 0.5im, -0.5im, 0.5] rtol =
+        1e-5
 end
 
 function test_runtests()
