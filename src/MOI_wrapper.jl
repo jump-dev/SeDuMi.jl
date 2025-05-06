@@ -22,6 +22,9 @@ import LinearAlgebra
 # supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
 # of the sets just listed above.
 
+# If these `const` are remove and coopy-pasted in the `struct` below, then we
+# get hit by this assertion error:
+# https://github.com/jump-dev/MathOptInterface.jl/blob/86bfa1d37d41f95ae8e2b9e6a7436e17ebe14d81/src/Utilities/struct_of_constraints.jl#L254
 const ComplexAff = MOI.VectorAffineFunction{Complex{Float64}}
 const RealAff = MOI.VectorAffineFunction{Float64}
 
