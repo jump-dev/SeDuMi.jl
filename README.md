@@ -7,6 +7,16 @@ The wrapper has two components:
    MATLAB function
  * an interface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
 
+Note that this SeDuMi natively supports the [Hermitian PSD cone](https://jump.dev/JuMP.jl/stable/manual/variables/#Example:-Hermitian-positive-semidefinite-variables).
+This interface provides the support of conic constraints, as create with
+`@constraint(model, ... in PSDCone())` or
+`@constraint(model, ... in HermitianPSDCone())`.
+If your model rather contains conic variables such as created with
+`@variable(model, ... in PSDCone())` or
+`@variable(model, ... in HermitianPSDCone())`, you should try
+[adding a Dualization layer](https://jump.dev/JuMP.jl/stable/tutorials/conic/dualization/)
+to see if it improves the solve time.
+
 ## Affiliation
 
 This wrapper is maintained by the JuMP community and is not an official wrapper
@@ -30,6 +40,31 @@ using JuMP, SeDuMi
 model = Model(SeDuMi.Optimizer)
 set_attribute(model, "fid", 0)
 ```
+
+## MathOptInterface API
+
+The SeDuMi optimizer supports the following constraints and attributes.
+
+List of supported objective functions:
+
+ * [`MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}`](@ref)
+
+List of supported variable types:
+
+ * [`MOI.Reals`](@ref)
+
+List of supported constraint types:
+
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.Nonnegatives`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.RotatedSecondOrderCone`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.SecondOrderCone`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in [`MOI.Zeros`](@ref)
+ * [`MOI.VectorAffineFunction{Float64}`](@ref) in `SeDuMi.ScaledPSDCone`
+ * [`MOI.VectorAffineFunction{ComplexF64}`](@ref) in `SeDuMi.ScaledPSDCone`
+
+List of supported model attributes:
+
+ * [`MOI.ObjectiveSense()`](@ref)
 
 ## Installation
 
