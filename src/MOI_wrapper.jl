@@ -22,13 +22,10 @@ import LinearAlgebra
 # supported supported sets are `VectorAffineFunction`-in-`S` where `S` is one
 # of the sets just listed above.
 
-const ComplexAff = MOI.VectorAffineFunction{Complex{Float64}}
-const RealAff = MOI.VectorAffineFunction{Float64}
-
 MOI.Utilities.@struct_of_constraints_by_function_types(
     ComplexOrReal,
-    ComplexAff,
-    RealAff,
+    MOI.VectorAffineFunction{Complex{Float64}},
+    MOI.VectorAffineFunction{Float64},
 )
 
 MOI.Utilities.@product_of_sets(ComplexCones, ScaledPSDCone,)
